@@ -291,7 +291,9 @@ func main() {
 		// Block until our controller manager is elected leader. We presume our
 		// entire process will terminate if we lose leadership, so we don't need
 		// to handle that.
-		<-mgr.Elected()
+		// (bad assumption?) pods can come in and out of service, and replicas should
+		// be ready to serve at all times! (https://github.com/fluxcd/source-controller/issues/837)
+		// <-mgr.Elected()
 
 		startFileServer(storage.BasePath, storageAddr)
 	}()
