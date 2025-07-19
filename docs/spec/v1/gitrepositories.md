@@ -177,6 +177,31 @@ data:
   ca.crt: <BASE64>
 ```
 
+#### HTTPS Mutual TLS authentication
+
+To authenticate towards a Git repository over HTTPS using mutual TLS,
+the referenced Secret's `.data` should contain the following keys:
+
+* `tls.crt` and `tls.key`, to specify the client certificate and private key used
+  for TLS client authentication. These must be used in conjunction, i.e.
+  specifying one without the other will lead to an error.
+* `ca.crt`, to specify the CA certificate used to verify the server, which is
+  required if the server is using a self-signed certificate.
+
+```yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: https-tls-certs
+  namespace: default
+type: Opaque
+data:
+  tls.crt: <BASE64>
+  tls.key: <BASE64>
+  ca.crt: <BASE64>
+```
+
 #### SSH authentication
 
 To authenticate towards a Git repository over SSH, the referenced Secret is
@@ -225,6 +250,9 @@ Supported options are:
 
 When provider is not specified, it defaults to `generic` indicating that
 mechanisms using `spec.secretRef` are used for authentication. 
+
+For a complete guide on how to set up authentication for cloud providers,
+see the integration [docs](/flux/integrations/).
 
 #### Azure
 
@@ -589,6 +617,28 @@ When specified, `.spec.ignore` overrides the [default exclusion
 list](#default-exclusions), and may overrule the [`.sourceignore` file
 exclusions](#sourceignore-file). See [excluding files](#excluding-files)
 for more information.
+
+### Sparse checkout
+
+`.spec.sparseCheckout` is an optional field to specify list of directories to
+checkout when cloning the repository. If specified, only the specified directory
+contents will be present in the artifact produced for this repository.
+
+```yaml
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: podinfo
+  namespace: default
+spec:
+  interval: 5m
+  url: https://github.com/stefanprodan/podinfo
+  ref:
+    branch: master
+  sparseCheckout:
+  - charts
+  - kustomize
+```
 
 ### Suspend
 
@@ -1129,6 +1179,27 @@ status:
     repository:
       name: repo2
     toPath: bar
+  ...
+```
+
+### Observed Sparse Checkout
+
+The source-controller reports observed sparse checkout in the GitRepository's
+`.status.observedSparseCheckout`. The observed sparse checkout is the latest
+`.spec.sparseCheckout` value which resulted in a [ready
+state](#ready-gitrepository), or stalled due to error it can not recover from
+without human intervention. The value is the same as the [sparseCheckout in
+spec](#sparse-checkout). It indicates the sparse checkout configuration used in
+building the current artifact in storage. It is also used by the controller to
+determine if an artifact needs to be rebuilt.
+
+Example:
+```yaml
+status:
+  ...
+  observedSparseCheckout:
+  - charts
+  - kustomize
   ...
 ```
 

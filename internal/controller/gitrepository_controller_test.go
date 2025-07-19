@@ -387,6 +387,63 @@ func TestGitRepositoryReconciler_reconcileSource_authStrategy(t *testing.T) {
 			},
 		},
 		{
+			name:     "HTTPS with mutual TLS makes Reconciling=True",
+			protocol: "https",
+			server: options{
+				publicKey:  tlsPublicKey,
+				privateKey: tlsPrivateKey,
+				ca:         tlsCA,
+			},
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "mtls-certs",
+				},
+				Data: map[string][]byte{
+					"ca.crt":  tlsCA,
+					"tls.crt": clientPublicKey,
+					"tls.key": clientPrivateKey,
+				},
+			},
+			beforeFunc: func(obj *sourcev1.GitRepository) {
+				obj.Spec.SecretRef = &meta.LocalObjectReference{Name: "mtls-certs"}
+			},
+			want: sreconcile.ResultSuccess,
+			assertConditions: []metav1.Condition{
+				*conditions.TrueCondition(meta.ReconcilingCondition, meta.ProgressingReason, "building artifact: new upstream revision 'master@sha1:<commit>'"),
+				*conditions.UnknownCondition(meta.ReadyCondition, meta.ProgressingReason, "building artifact: new upstream revision 'master@sha1:<commit>'"),
+			},
+		},
+		{
+			name:     "HTTPS with mutual TLS and invalid private key makes CheckoutFailed=True and returns error",
+			protocol: "https",
+			server: options{
+				publicKey:  tlsPublicKey,
+				privateKey: tlsPrivateKey,
+				ca:         tlsCA,
+			},
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-mtls-certs",
+				},
+				Data: map[string][]byte{
+					"ca.crt":  tlsCA,
+					"tls.crt": clientPublicKey,
+					"tls.key": []byte("invalid"),
+				},
+			},
+			beforeFunc: func(obj *sourcev1.GitRepository) {
+				obj.Spec.SecretRef = &meta.LocalObjectReference{Name: "invalid-mtls-certs"}
+				conditions.MarkReconciling(obj, meta.ProgressingReason, "foo")
+				conditions.MarkUnknown(obj, meta.ReadyCondition, meta.ProgressingReason, "foo")
+			},
+			wantErr: true,
+			assertConditions: []metav1.Condition{
+				*conditions.TrueCondition(sourcev1.FetchFailedCondition, sourcev1.GitOperationFailedReason, "tls: failed to find any PEM data in key input"),
+				*conditions.TrueCondition(meta.ReconcilingCondition, meta.ProgressingReason, "foo"),
+				*conditions.UnknownCondition(meta.ReadyCondition, meta.ProgressingReason, "foo"),
+			},
+		},
+		{
 			name:     "HTTPS with CAFile secret makes Reconciling=True",
 			protocol: "https",
 			server: options{
@@ -600,7 +657,7 @@ func TestGitRepositoryReconciler_reconcileSource_authStrategy(t *testing.T) {
 					Name: "github-app-secret",
 				},
 				Data: map[string][]byte{
-					github.AppIDKey: []byte("1111"),
+					github.KeyAppID: []byte("1111"),
 				},
 			},
 			beforeFunc: func(obj *sourcev1.GitRepository) {
@@ -730,12 +787,11 @@ func TestGitRepositoryReconciler_reconcileSource_authStrategy(t *testing.T) {
 
 func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 	tests := []struct {
-		name                 string
-		url                  string
-		secret               *corev1.Secret
-		beforeFunc           func(obj *sourcev1.GitRepository)
-		wantProviderOptsName string
-		wantErr              error
+		name       string
+		url        string
+		secret     *corev1.Secret
+		beforeFunc func(obj *sourcev1.GitRepository)
+		wantErr    string
 	}{
 		{
 			name: "azure provider",
@@ -743,7 +799,7 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 			beforeFunc: func(obj *sourcev1.GitRepository) {
 				obj.Spec.Provider = sourcev1.GitProviderAzure
 			},
-			wantProviderOptsName: sourcev1.GitProviderAzure,
+			wantErr: "ManagedIdentityCredential",
 		},
 		{
 			name: "github provider with no secret ref",
@@ -751,8 +807,7 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 			beforeFunc: func(obj *sourcev1.GitRepository) {
 				obj.Spec.Provider = sourcev1.GitProviderGitHub
 			},
-			wantProviderOptsName: sourcev1.GitProviderGitHub,
-			wantErr:              errors.New("secretRef with github app data must be specified when provider is set to github"),
+			wantErr: "secretRef with github app data must be specified when provider is set to github",
 		},
 		{
 			name: "github provider with github app data in secret",
@@ -762,9 +817,9 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 					Name: "githubAppSecret",
 				},
 				Data: map[string][]byte{
-					github.AppIDKey:             []byte("123"),
-					github.AppInstallationIDKey: []byte("456"),
-					github.AppPrivateKey:        []byte("abc"),
+					github.KeyAppID:             []byte("123"),
+					github.KeyAppInstallationID: []byte("456"),
+					github.KeyAppPrivateKey:     []byte("abc"),
 				},
 			},
 			beforeFunc: func(obj *sourcev1.GitRepository) {
@@ -773,7 +828,7 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 					Name: "githubAppSecret",
 				}
 			},
-			wantProviderOptsName: sourcev1.GitProviderGitHub,
+			wantErr: "Key must be a PEM encoded PKCS1 or PKCS8 key",
 		},
 		{
 			name: "generic provider with github app data in secret",
@@ -783,7 +838,7 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 					Name: "githubAppSecret",
 				},
 				Data: map[string][]byte{
-					github.AppIDKey: []byte("123"),
+					github.KeyAppID: []byte("123"),
 				},
 			},
 			beforeFunc: func(obj *sourcev1.GitRepository) {
@@ -792,7 +847,7 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 					Name: "githubAppSecret",
 				}
 			},
-			wantErr: errors.New("secretRef '/githubAppSecret' has github app data but provider is not set to github"),
+			wantErr: "secretRef '/githubAppSecret' has github app data but provider is not set to github",
 		},
 		{
 			name: "generic provider",
@@ -809,7 +864,7 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 					Name: "authSecret",
 				}
 			},
-			wantErr: errors.New("failed to get secret '/authSecret': secrets \"authSecret\" not found"),
+			wantErr: "failed to get secret '/authSecret': secrets \"authSecret\" not found",
 		},
 		{
 			url:  "https://example.com/org/repo",
@@ -842,20 +897,19 @@ func TestGitRepositoryReconciler_getAuthOpts_provider(t *testing.T) {
 			if tt.beforeFunc != nil {
 				tt.beforeFunc(obj)
 			}
-			opts, err := r.getAuthOpts(context.TODO(), obj, *url)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			opts, err := r.getAuthOpts(ctx, obj, *url, nil)
 
-			if tt.wantErr != nil {
+			if tt.wantErr != "" {
 				g.Expect(err).To(HaveOccurred())
-				g.Expect(err.Error()).To(ContainSubstring(tt.wantErr.Error()))
+				g.Expect(err.Error()).To(ContainSubstring(tt.wantErr))
 			} else {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(opts).ToNot(BeNil())
-				if tt.wantProviderOptsName != "" {
-					g.Expect(opts.ProviderOpts).ToNot(BeNil())
-					g.Expect(opts.ProviderOpts.Name).To(Equal(tt.wantProviderOptsName))
-				} else {
-					g.Expect(opts.ProviderOpts).To(BeNil())
-				}
+				g.Expect(opts.BearerToken).To(BeEmpty())
+				g.Expect(opts.Username).To(BeEmpty())
+				g.Expect(opts.Password).To(BeEmpty())
 			}
 		})
 	}
@@ -2210,6 +2264,7 @@ func TestGitRepositoryReconciler_getProxyOpts(t *testing.T) {
 		secret    string
 		err       string
 		proxyOpts *transport.ProxyOptions
+		proxyURL  *url.URL
 	}{
 		{
 			name:   "non-existent secret",
@@ -2229,16 +2284,22 @@ func TestGitRepositoryReconciler_getProxyOpts(t *testing.T) {
 				Username: "user",
 				Password: "pass",
 			},
+			proxyURL: &url.URL{
+				Scheme: "https",
+				Host:   "example.com",
+				User:   url.UserPassword("user", "pass"),
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
-			opts, err := r.getProxyOpts(context.TODO(), tt.secret, "default")
+			opts, proxyURL, err := r.getProxyOpts(context.TODO(), tt.secret, "default")
 			if opts != nil {
 				g.Expect(err).ToNot(HaveOccurred())
 				g.Expect(opts).To(Equal(tt.proxyOpts))
+				g.Expect(proxyURL).To(Equal(tt.proxyURL))
 			} else {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(err.Error()).To(ContainSubstring(tt.err))
@@ -3070,6 +3131,38 @@ func TestGitContentConfigChanged(t *testing.T) {
 			obj: sourcev1.GitRepository{
 				Spec:   sourcev1.GitRepositorySpec{RecurseSubmodules: true},
 				Status: sourcev1.GitRepositoryStatus{ObservedRecurseSubmodules: true},
+			},
+			want: false,
+		},
+		{
+			name: "unobserved sparse checkout",
+			obj: sourcev1.GitRepository{
+				Spec:   sourcev1.GitRepositorySpec{SparseCheckout: []string{"a/b/c", "x/y/z"}},
+				Status: sourcev1.GitRepositoryStatus{ObservedSparseCheckout: []string{"a/b/c"}},
+			},
+			want: true,
+		},
+		{
+			name: "unobserved case sensitive sparse checkout",
+			obj: sourcev1.GitRepository{
+				Spec:   sourcev1.GitRepositorySpec{SparseCheckout: []string{"a/b/c", "x/y/Z"}},
+				Status: sourcev1.GitRepositoryStatus{ObservedSparseCheckout: []string{"a/b/c", "x/y/z"}},
+			},
+			want: true,
+		},
+		{
+			name: "observed sparse checkout",
+			obj: sourcev1.GitRepository{
+				Spec:   sourcev1.GitRepositorySpec{SparseCheckout: []string{"a/b/c", "x/y/z"}},
+				Status: sourcev1.GitRepositoryStatus{ObservedSparseCheckout: []string{"a/b/c", "x/y/z"}},
+			},
+			want: false,
+		},
+		{
+			name: "observed sparse checkout with leading slash",
+			obj: sourcev1.GitRepository{
+				Spec:   sourcev1.GitRepositorySpec{SparseCheckout: []string{"./a/b/c", "./x/y/z"}},
+				Status: sourcev1.GitRepositoryStatus{ObservedSparseCheckout: []string{"./a/b/c", "./x/y/z"}},
 			},
 			want: false,
 		},

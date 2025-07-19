@@ -67,7 +67,6 @@ import (
 	"github.com/fluxcd/pkg/testserver"
 
 	sourcev1 "github.com/fluxcd/source-controller/api/v1"
-	sourcev1beta2 "github.com/fluxcd/source-controller/api/v1beta2"
 	serror "github.com/fluxcd/source-controller/internal/error"
 	"github.com/fluxcd/source-controller/internal/helm/chart"
 	"github.com/fluxcd/source-controller/internal/helm/chart/secureloader"
@@ -1036,12 +1035,12 @@ func TestHelmChartReconciler_buildFromHelmRepository(t *testing.T) {
 				}
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Generic{Err: errors.New("failed to get authentication secret '/invalid'")},
+			wantErr: &serror.Generic{Err: errors.New("failed to get authentication secret: secrets \"invalid\" not found")},
 			assertFunc: func(g *WithT, obj *sourcev1.HelmChart, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 
 				g.Expect(obj.Status.Conditions).To(conditions.MatchConditions([]metav1.Condition{
-					*conditions.TrueCondition(sourcev1.FetchFailedCondition, sourcev1.AuthenticationFailedReason, "failed to get authentication secret '/invalid'"),
+					*conditions.TrueCondition(sourcev1.FetchFailedCondition, sourcev1.AuthenticationFailedReason, "failed to get authentication secret: secrets \"invalid\" not found"),
 				}))
 			},
 		},
@@ -1305,12 +1304,12 @@ func TestHelmChartReconciler_buildFromOCIHelmRepository(t *testing.T) {
 				}
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Generic{Err: errors.New("failed to get authentication secret '/invalid'")},
+			wantErr: &serror.Generic{Err: errors.New("failed to get authentication secret: secrets \"invalid\" not found")},
 			assertFunc: func(g *WithT, obj *sourcev1.HelmChart, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 
 				g.Expect(obj.Status.Conditions).To(conditions.MatchConditions([]metav1.Condition{
-					*conditions.TrueCondition(sourcev1.FetchFailedCondition, sourcev1.AuthenticationFailedReason, "failed to get authentication secret '/invalid'"),
+					*conditions.TrueCondition(sourcev1.FetchFailedCondition, sourcev1.AuthenticationFailedReason, "failed to get authentication secret: secrets \"invalid\" not found"),
 				}))
 			},
 		},
@@ -1366,7 +1365,7 @@ func TestHelmChartReconciler_buildFromOCIHelmRepository(t *testing.T) {
 				Spec: sourcev1.HelmRepositorySpec{
 					URL:      fmt.Sprintf("oci://%s/testrepo", testRegistryServer.registryHost),
 					Timeout:  &metav1.Duration{Duration: timeout},
-					Provider: sourcev1beta2.GenericOCIProvider,
+					Provider: sourcev1.GenericOCIProvider,
 					Type:     sourcev1.HelmRepositoryTypeOCI,
 					Insecure: true,
 				},
@@ -2516,7 +2515,7 @@ func TestHelmChartReconciler_reconcileSourceFromOCI_authStrategy(t *testing.T) {
 				},
 			},
 			assertConditions: []metav1.Condition{
-				*conditions.TrueCondition(sourcev1.FetchFailedCondition, "Unknown", "unknown build error: failed to construct Helm client's TLS config: cannot append certificate into certificate pool: invalid CA certificate"),
+				*conditions.TrueCondition(sourcev1.FetchFailedCondition, "Unknown", "unknown build error: failed to construct Helm client's TLS config: failed to parse CA certificate"),
 			},
 		},
 		{
@@ -2595,7 +2594,7 @@ func TestHelmChartReconciler_reconcileSourceFromOCI_authStrategy(t *testing.T) {
 					Interval: metav1.Duration{Duration: interval},
 					Timeout:  &metav1.Duration{Duration: timeout},
 					Type:     sourcev1.HelmRepositoryTypeOCI,
-					Provider: sourcev1beta2.GenericOCIProvider,
+					Provider: sourcev1.GenericOCIProvider,
 					URL:      fmt.Sprintf("oci://%s/testrepo", server.registryHost),
 					Insecure: tt.insecure,
 				},
@@ -2798,7 +2797,7 @@ func TestHelmChartRepository_reconcileSource_verifyOCISourceSignature_keyless(t 
 				Spec: sourcev1.HelmRepositorySpec{
 					URL:      "oci://ghcr.io/stefanprodan/charts",
 					Timeout:  &metav1.Duration{Duration: timeout},
-					Provider: sourcev1beta2.GenericOCIProvider,
+					Provider: sourcev1.GenericOCIProvider,
 					Type:     sourcev1.HelmRepositoryTypeOCI,
 				},
 			}
@@ -3040,8 +3039,8 @@ func TestHelmChartReconciler_reconcileSourceFromOCI_verifySignatureNotation(t *t
 			wantErrMsg:      fmt.Sprintf("failed to verify the signature using provider 'notation': '%s' not found in secret '/notation-config'", snotation.DefaultTrustPolicyKey),
 			want:            sreconcile.ResultEmpty,
 			assertConditions: []metav1.Condition{
-				*conditions.TrueCondition(sourcev1.FetchFailedCondition, "Unknown", fmt.Sprintf("failed to verify the signature using provider 'notation': '%s' not found in secret '/notation-config'", snotation.DefaultTrustPolicyKey)),
-				*conditions.FalseCondition(sourcev1.SourceVerifiedCondition, sourcev1.VerificationError, fmt.Sprintf("failed to verify the signature using provider 'notation': '%s' not found in secret '/notation-config'", snotation.DefaultTrustPolicyKey)),
+				*conditions.TrueCondition(sourcev1.FetchFailedCondition, "Unknown", "failed to verify the signature using provider 'notation': '%s' not found in secret '/notation-config'", snotation.DefaultTrustPolicyKey),
+				*conditions.FalseCondition(sourcev1.SourceVerifiedCondition, sourcev1.VerificationError, "failed to verify the signature using provider 'notation': '%s' not found in secret '/notation-config'", snotation.DefaultTrustPolicyKey),
 			},
 		},
 	}
@@ -3059,7 +3058,7 @@ func TestHelmChartReconciler_reconcileSourceFromOCI_verifySignatureNotation(t *t
 				Spec: sourcev1.HelmRepositorySpec{
 					URL:      fmt.Sprintf("oci://%s/testrepo", server.registryHost),
 					Timeout:  &metav1.Duration{Duration: timeout},
-					Provider: sourcev1beta2.GenericOCIProvider,
+					Provider: sourcev1.GenericOCIProvider,
 					Type:     sourcev1.HelmRepositoryTypeOCI,
 					Insecure: true,
 				},
@@ -3332,7 +3331,7 @@ func TestHelmChartReconciler_reconcileSourceFromOCI_verifySignatureCosign(t *tes
 				Spec: sourcev1.HelmRepositorySpec{
 					URL:      fmt.Sprintf("oci://%s/testrepo", server.registryHost),
 					Timeout:  &metav1.Duration{Duration: timeout},
-					Provider: sourcev1beta2.GenericOCIProvider,
+					Provider: sourcev1.GenericOCIProvider,
 					Type:     sourcev1.HelmRepositoryTypeOCI,
 					Insecure: true,
 				},

@@ -70,7 +70,6 @@ import (
 	"github.com/fluxcd/source-controller/internal/helm/chart"
 	"github.com/fluxcd/source-controller/internal/helm/getter"
 	"github.com/fluxcd/source-controller/internal/helm/repository"
-	"github.com/fluxcd/source-controller/internal/oci"
 	soci "github.com/fluxcd/source-controller/internal/oci"
 	scosign "github.com/fluxcd/source-controller/internal/oci/cosign"
 	"github.com/fluxcd/source-controller/internal/oci/notation"
@@ -404,7 +403,7 @@ func (r *HelmChartReconciler) reconcileStorage(ctx context.Context, sp *patch.Se
 		if artifactMissing {
 			msg += ": disappeared from storage"
 		}
-		rreconcile.ProgressiveStatus(true, obj, meta.ProgressingReason, msg)
+		rreconcile.ProgressiveStatus(true, obj, meta.ProgressingReason, "%s", msg)
 		conditions.Delete(obj, sourcev1.ArtifactInStorageCondition)
 		if err := sp.Patch(ctx, obj, r.patchOptions...); err != nil {
 			return sreconcile.ResultEmpty, serror.NewGeneric(err, sourcev1.PatchOperationFailedReason)
@@ -984,7 +983,7 @@ func (r *HelmChartReconciler) garbageCollect(ctx context.Context, obj *sourcev1.
 		}
 		if len(delFiles) > 0 {
 			r.eventLogf(ctx, obj, eventv1.EventTypeTrace, "GarbageCollectionSucceeded",
-				fmt.Sprintf("garbage collected %d artifacts", len(delFiles)))
+				"garbage collected %d artifacts", len(delFiles))
 			return nil
 		}
 	}
@@ -1255,7 +1254,7 @@ func observeChartBuild(ctx context.Context, sp *patch.SerialPatcher, pOpts []pat
 	if build.Complete() {
 		conditions.Delete(obj, sourcev1.FetchFailedCondition)
 		conditions.Delete(obj, sourcev1.BuildFailedCondition)
-		if build.VerifiedResult == oci.VerificationResultSuccess {
+		if build.VerifiedResult == soci.VerificationResultSuccess {
 			conditions.MarkTrue(obj, sourcev1.SourceVerifiedCondition, meta.SucceededReason, "verified signature of version %s", build.Version)
 		}
 	}

@@ -39,6 +39,7 @@ import (
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	"github.com/fluxcd/pkg/auth"
 	pkgcache "github.com/fluxcd/pkg/cache"
 	"github.com/fluxcd/pkg/git"
 	"github.com/fluxcd/pkg/runtime/client"
@@ -52,9 +53,7 @@ import (
 	"github.com/fluxcd/pkg/runtime/pprof"
 	"github.com/fluxcd/pkg/runtime/probes"
 
-	v1 "github.com/fluxcd/source-controller/api/v1"
-	"github.com/fluxcd/source-controller/api/v1beta2"
-
+	sourcev1 "github.com/fluxcd/source-controller/api/v1"
 	// +kubebuilder:scaffold:imports
 
 	"github.com/fluxcd/source-controller/internal/cache"
@@ -85,14 +84,13 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(v1beta2.AddToScheme(scheme))
-	utilruntime.Must(v1.AddToScheme(scheme))
+	utilruntime.Must(sourcev1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
 	const (
-		tokenCacheDefaultMaxSize = 0
+		tokenCacheDefaultMaxSize = 100
 	)
 
 	var (
@@ -178,6 +176,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	switch enabled, err := features.Enabled(auth.FeatureGateObjectLevelWorkloadIdentity); {
+	case err != nil:
+		setupLog.Error(err, "unable to check feature gate "+auth.FeatureGateObjectLevelWorkloadIdentity)
+		os.Exit(1)
+	case enabled:
+		auth.EnableObjectLevelWorkloadIdentity()
+	}
+
 	if err := intervalJitterOptions.SetGlobalJitter(nil); err != nil {
 		setupLog.Error(err, "unable to set global jitter")
 		os.Exit(1)
@@ -187,7 +193,7 @@ func main() {
 
 	probes.SetupChecks(mgr, setupLog)
 
-	metrics := helper.NewMetrics(mgr, metrics.MustMakeRecorder(), v1.SourceFinalizer)
+	metrics := helper.NewMetrics(mgr, metrics.MustMakeRecorder(), sourcev1.SourceFinalizer)
 	cacheRecorder := cache.MustMakeMetrics()
 	eventRecorder := mustSetupEventRecorder(mgr, eventsAddr, controllerName)
 	storage := mustInitStorage(storagePath, storageAdvAddr, artifactRetentionTTL, artifactRetentionRecords, artifactDigestAlgo)
@@ -216,12 +222,12 @@ func main() {
 		Metrics:        metrics,
 		Storage:        storage,
 		ControllerName: controllerName,
+		TokenCache:     tokenCache,
 	}).SetupWithManagerAndOptions(mgr, controller.GitRepositoryReconcilerOptions{
 		DependencyRequeueInterval: requeueDependency,
 		RateLimiter:               helper.GetRateLimiter(rateLimiterOptions),
-		TokenCache:                tokenCache,
 	}); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", v1.GitRepositoryKind)
+		setupLog.Error(err, "unable to create controller", "controller", sourcev1.GitRepositoryKind)
 		os.Exit(1)
 	}
 
@@ -238,7 +244,7 @@ func main() {
 	}).SetupWithManagerAndOptions(mgr, controller.HelmRepositoryReconcilerOptions{
 		RateLimiter: helper.GetRateLimiter(rateLimiterOptions),
 	}); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", v1.HelmRepositoryKind)
+		setupLog.Error(err, "unable to create controller", "controller", sourcev1.HelmRepositoryKind)
 		os.Exit(1)
 	}
 
@@ -256,7 +262,7 @@ func main() {
 	}).SetupWithManagerAndOptions(ctx, mgr, controller.HelmChartReconcilerOptions{
 		RateLimiter: helper.GetRateLimiter(rateLimiterOptions),
 	}); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", v1.HelmChartKind)
+		setupLog.Error(err, "unable to create controller", "controller", sourcev1.HelmChartKind)
 		os.Exit(1)
 	}
 
@@ -269,7 +275,7 @@ func main() {
 	}).SetupWithManagerAndOptions(mgr, controller.BucketReconcilerOptions{
 		RateLimiter: helper.GetRateLimiter(rateLimiterOptions),
 	}); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", v1.BucketKind)
+		setupLog.Error(err, "unable to create controller", "controller", sourcev1.BucketKind)
 		os.Exit(1)
 	}
 
@@ -278,11 +284,12 @@ func main() {
 		Storage:        storage,
 		EventRecorder:  eventRecorder,
 		ControllerName: controllerName,
+		TokenCache:     tokenCache,
 		Metrics:        metrics,
 	}).SetupWithManagerAndOptions(mgr, controller.OCIRepositoryReconcilerOptions{
 		RateLimiter: helper.GetRateLimiter(rateLimiterOptions),
 	}); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", v1beta2.OCIRepositoryKind)
+		setupLog.Error(err, "unable to create controller", "controller", sourcev1.OCIRepositoryKind)
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
@@ -372,11 +379,11 @@ func mustSetupManager(metricsAddr, healthAddr string, maxConcurrent int,
 		},
 		Cache: ctrlcache.Options{
 			ByObject: map[ctrlclient.Object]ctrlcache.ByObject{
-				&v1.GitRepository{}:      {Label: watchSelector},
-				&v1.HelmRepository{}:     {Label: watchSelector},
-				&v1.HelmChart{}:          {Label: watchSelector},
-				&v1.Bucket{}:             {Label: watchSelector},
-				&v1beta2.OCIRepository{}: {Label: watchSelector},
+				&sourcev1.GitRepository{}:  {Label: watchSelector},
+				&sourcev1.HelmRepository{}: {Label: watchSelector},
+				&sourcev1.HelmChart{}:      {Label: watchSelector},
+				&sourcev1.Bucket{}:         {Label: watchSelector},
+				&sourcev1.OCIRepository{}:  {Label: watchSelector},
 			},
 		},
 		Metrics: metricsserver.Options{
