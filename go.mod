@@ -2,6 +2,8 @@ module github.com/fluxcd/source-controller
 
 go 1.24.0
 
+toolchain go1.24.2
+
 replace github.com/fluxcd/source-controller/api => ./api
 
 // Pin semver to v3.3.0 to avoid breaking changes in v3.3.1
@@ -51,7 +53,6 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-containerregistry v0.20.6
 	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20250613215107-59a4b8593039
-	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.94
 	github.com/notaryproject/notation-core-go v1.3.0
 	github.com/notaryproject/notation-go v1.3.2
@@ -241,6 +242,7 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.2 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
