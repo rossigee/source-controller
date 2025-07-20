@@ -63,8 +63,15 @@ make api-docs         # Generate API documentation
 
 1. **Unit Tests**: Mock external dependencies using interfaces
 2. **Controller Tests**: Use envtest for Kubernetes API simulation
-3. **Fuzz Tests**: Located in `tests/fuzz/` for parsing logic
-4. **E2E Tests**: Full integration tests with real clusters
+3. **Storage Tests**: Comprehensive tests for all storage backends in `pkg/storage/*_test.go`
+4. **Server Tests**: HTTP server tests with mock storage providers
+5. **Fuzz Tests**: Located in `tests/fuzz/` for parsing logic
+6. **E2E Tests**: Full integration tests with real clusters
+
+### Storage Package Tests
+- `factory_test.go`: Backend selection and configuration validation
+- `filesystem_test.go`: Complete filesystem storage backend testing
+- `server_test.go`: HTTP artifact server with health checks and error handling
 
 ## Important Implementation Details
 
