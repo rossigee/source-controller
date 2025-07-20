@@ -461,9 +461,8 @@ func mustInitHelmCache(maxSize int, itemTTL, purgeInterval string) (*cache.Cache
 }
 
 func mustInitStorage(ctx context.Context, path string, storageAdvAddr string, artifactRetentionTTL time.Duration, artifactRetentionRecords int, artifactDigestAlgo string, backend string, s3Bucket string, s3Prefix string, s3Region string, s3Endpoint string, s3ForcePathStyle bool) storage.StorageProvider {
-	if storageAdvAddr == "" {
-		storageAdvAddr = determineAdvStorageAddr(storageAdvAddr)
-	}
+	// storageAdvAddr is already set properly by the caller
+	// No need to call determineAdvStorageAddr here
 
 	if artifactDigestAlgo != intdigest.Canonical.String() {
 		algo, err := intdigest.AlgorithmForName(artifactDigestAlgo)
