@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -62,6 +63,7 @@ import (
 	"github.com/fluxcd/source-controller/internal/features"
 	"github.com/fluxcd/source-controller/internal/helm"
 	"github.com/fluxcd/source-controller/internal/helm/registry"
+	"github.com/fluxcd/source-controller/pkg/storage"
 )
 
 const controllerName = "source-controller"
@@ -119,6 +121,13 @@ func main() {
 		artifactRetentionRecords int
 		artifactDigestAlgo       string
 		tokenCacheOptions        pkgcache.TokenFlags
+		// Storage backend configuration
+		storageBackend           string
+		s3Bucket                 string
+		s3Prefix                 string
+		s3Region                 string
+		s3Endpoint               string
+		s3ForcePathStyle         bool
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-addr", envOrDefault("METRICS_ADDR", ":8080"),
@@ -132,6 +141,18 @@ func main() {
 		"The address the static file server binds to.")
 	flag.StringVar(&storageAdvAddr, "storage-adv-addr", envOrDefault("STORAGE_ADV_ADDR", ""),
 		"The advertised address of the static file server.")
+	flag.StringVar(&storageBackend, "storage-backend", envOrDefault("STORAGE_BACKEND", "filesystem"),
+		"The storage backend type. Options: filesystem, s3")
+	flag.StringVar(&s3Bucket, "s3-bucket", envOrDefault("S3_BUCKET", ""),
+		"The S3 bucket name (required when storage-backend=s3).")
+	flag.StringVar(&s3Prefix, "s3-prefix", envOrDefault("S3_PREFIX", ""),
+		"The S3 key prefix for artifacts.")
+	flag.StringVar(&s3Region, "s3-region", envOrDefault("S3_REGION", "us-east-1"),
+		"The S3 region.")
+	flag.StringVar(&s3Endpoint, "s3-endpoint", envOrDefault("S3_ENDPOINT", ""),
+		"The S3 custom endpoint (for MinIO, etc).")
+	flag.BoolVar(&s3ForcePathStyle, "s3-force-path-style", false,
+		"Force S3 path-style URLs (required for MinIO).")
 	flag.IntVar(&concurrent, "concurrent", 2, "The number of concurrent reconciles per controller.")
 	flag.Int64Var(&helmIndexLimit, "helm-index-max-size", helm.MaxIndexSize,
 		"The max allowed size in bytes of a Helm repository index file.")
@@ -196,7 +217,12 @@ func main() {
 	metrics := helper.NewMetrics(mgr, metrics.MustMakeRecorder(), sourcev1.SourceFinalizer)
 	cacheRecorder := cache.MustMakeMetrics()
 	eventRecorder := mustSetupEventRecorder(mgr, eventsAddr, controllerName)
-	storage := mustInitStorage(storagePath, storageAdvAddr, artifactRetentionTTL, artifactRetentionRecords, artifactDigestAlgo)
+	
+	ctx := ctrl.SetupSignalHandler()
+	storageProvider := mustInitStorage(ctx, storagePath, storageAdvAddr, artifactRetentionTTL, artifactRetentionRecords, artifactDigestAlgo, storageBackend, s3Bucket, s3Prefix, s3Region, s3Endpoint, s3ForcePathStyle)
+	
+	// Create legacy storage adapter for backwards compatibility
+	legacyStorage := storage.NewLegacyStorageAdapter(storageProvider, storagePath, storageAdvAddr)
 
 	mustSetupHelmLimits(helmIndexLimit, helmChartLimit, helmChartFileLimit)
 	helmIndexCache, helmIndexCacheItemTTL := mustInitHelmCache(helmCacheMaxSize, helmCacheTTL, helmCachePurgeInterval)
@@ -214,13 +240,11 @@ func main() {
 		}
 	}
 
-	ctx := ctrl.SetupSignalHandler()
-
 	if err := (&controller.GitRepositoryReconciler{
 		Client:         mgr.GetClient(),
 		EventRecorder:  eventRecorder,
 		Metrics:        metrics,
-		Storage:        storage,
+		Storage:        legacyStorage,
 		ControllerName: controllerName,
 		TokenCache:     tokenCache,
 	}).SetupWithManagerAndOptions(mgr, controller.GitRepositoryReconcilerOptions{
@@ -235,7 +259,7 @@ func main() {
 		Client:         mgr.GetClient(),
 		EventRecorder:  eventRecorder,
 		Metrics:        metrics,
-		Storage:        storage,
+		Storage:        legacyStorage,
 		Getters:        getters,
 		ControllerName: controllerName,
 		Cache:          helmIndexCache,
@@ -251,7 +275,7 @@ func main() {
 	if err := (&controller.HelmChartReconciler{
 		Client:                  mgr.GetClient(),
 		RegistryClientGenerator: registry.ClientGenerator,
-		Storage:                 storage,
+		Storage:                 legacyStorage,
 		Getters:                 getters,
 		EventRecorder:           eventRecorder,
 		Metrics:                 metrics,
@@ -270,7 +294,7 @@ func main() {
 		Client:         mgr.GetClient(),
 		EventRecorder:  eventRecorder,
 		Metrics:        metrics,
-		Storage:        storage,
+		Storage:        legacyStorage,
 		ControllerName: controllerName,
 	}).SetupWithManagerAndOptions(mgr, controller.BucketReconcilerOptions{
 		RateLimiter: helper.GetRateLimiter(rateLimiterOptions),
@@ -281,7 +305,7 @@ func main() {
 
 	if err := (&controller.OCIRepositoryReconciler{
 		Client:         mgr.GetClient(),
-		Storage:        storage,
+		Storage:        legacyStorage,
 		EventRecorder:  eventRecorder,
 		ControllerName: controllerName,
 		TokenCache:     tokenCache,
@@ -294,15 +318,14 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
+	// Start the distributed artifact server
+	// This can run on all pods, not just the leader!
 	go func() {
-		// Block until our controller manager is elected leader. We presume our
-		// entire process will terminate if we lose leadership, so we don't need
-		// to handle that.
-		// (bad assumption?) pods can come in and out of service, and replicas should
-		// be ready to serve at all times! (https://github.com/fluxcd/source-controller/issues/837)
-		// <-mgr.Elected()
-
-		startFileServer(storage.BasePath, storageAddr)
+		artifactServer := storage.NewArtifactServer(ctx, storageProvider, setupLog.WithName("artifact-server"))
+		if err := artifactServer.ListenAndServe(storageAddr); err != nil && err != http.ErrServerClosed {
+			setupLog.Error(err, "artifact server error")
+			os.Exit(1)
+		}
 	}()
 
 	setupLog.Info("starting manager")
@@ -437,7 +460,7 @@ func mustInitHelmCache(maxSize int, itemTTL, purgeInterval string) (*cache.Cache
 	return cache.New(maxSize, interval), ttl
 }
 
-func mustInitStorage(path string, storageAdvAddr string, artifactRetentionTTL time.Duration, artifactRetentionRecords int, artifactDigestAlgo string) *controller.Storage {
+func mustInitStorage(ctx context.Context, path string, storageAdvAddr string, artifactRetentionTTL time.Duration, artifactRetentionRecords int, artifactDigestAlgo string, backend string, s3Bucket string, s3Prefix string, s3Region string, s3Endpoint string, s3ForcePathStyle bool) storage.StorageProvider {
 	if storageAdvAddr == "" {
 		storageAdvAddr = determineAdvStorageAddr(storageAdvAddr)
 	}
@@ -451,12 +474,29 @@ func mustInitStorage(path string, storageAdvAddr string, artifactRetentionTTL ti
 		intdigest.Canonical = algo
 	}
 
-	storage, err := controller.NewStorage(path, storageAdvAddr, artifactRetentionTTL, artifactRetentionRecords)
+	// Create storage configuration
+	cfg := storage.Config{
+		Backend:          storage.BackendType(backend),
+		Hostname:         storageAdvAddr,
+		RetentionTTL:     artifactRetentionTTL,
+		RetentionRecords: artifactRetentionRecords,
+		// Filesystem config
+		FilesystemPath:   path,
+		// S3 config
+		S3Bucket:         s3Bucket,
+		S3Prefix:         s3Prefix,
+		S3Region:         s3Region,
+		S3Endpoint:       s3Endpoint,
+		S3ForcePathStyle: s3ForcePathStyle,
+		S3URLExpiration:  15 * time.Minute,
+	}
+
+	provider, err := storage.NewProvider(ctx, cfg)
 	if err != nil {
-		setupLog.Error(err, "unable to initialise storage")
+		setupLog.Error(err, "unable to initialise storage provider")
 		os.Exit(1)
 	}
-	return storage
+	return provider
 }
 
 func determineAdvStorageAddr(storageAddr string) string {

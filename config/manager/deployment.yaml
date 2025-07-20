@@ -67,7 +67,7 @@ spec:
         readinessProbe:
           httpGet:
             port: http
-            path: /
+            path: /health
         resources:
           limits:
             cpu: 1000m
