@@ -33,10 +33,10 @@ func TestNewProvider(t *testing.T) {
 		{
 			name: "filesystem backend",
 			config: Config{
-				Backend:        BackendFilesystem,
-				FilesystemPath: "/tmp",
-				Hostname:       "test.local",
-				RetentionTTL:   time.Minute,
+				Backend:          BackendFilesystem,
+				FilesystemPath:   "/tmp",
+				Hostname:         "test.local",
+				RetentionTTL:     time.Minute,
 				RetentionRecords: 2,
 			},
 			wantErr: false,
@@ -71,9 +71,9 @@ func TestNewProvider(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 			ctx := context.Background()
-			
+
 			provider, err := NewProvider(ctx, tt.config)
-			
+
 			if tt.wantErr {
 				g.Expect(err).To(HaveOccurred())
 				g.Expect(provider).To(BeNil())
@@ -87,7 +87,7 @@ func TestNewProvider(t *testing.T) {
 
 func TestBackendTypes(t *testing.T) {
 	g := NewWithT(t)
-	
+
 	g.Expect(string(BackendFilesystem)).To(Equal("filesystem"))
 	g.Expect(string(BackendS3)).To(Equal("s3"))
 }

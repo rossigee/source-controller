@@ -122,12 +122,12 @@ func main() {
 		artifactDigestAlgo       string
 		tokenCacheOptions        pkgcache.TokenFlags
 		// Storage backend configuration
-		storageBackend           string
-		s3Bucket                 string
-		s3Prefix                 string
-		s3Region                 string
-		s3Endpoint               string
-		s3ForcePathStyle         bool
+		storageBackend   string
+		s3Bucket         string
+		s3Prefix         string
+		s3Region         string
+		s3Endpoint       string
+		s3ForcePathStyle bool
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-addr", envOrDefault("METRICS_ADDR", ":8080"),
@@ -217,10 +217,10 @@ func main() {
 	metrics := helper.NewMetrics(mgr, metrics.MustMakeRecorder(), sourcev1.SourceFinalizer)
 	cacheRecorder := cache.MustMakeMetrics()
 	eventRecorder := mustSetupEventRecorder(mgr, eventsAddr, controllerName)
-	
+
 	ctx := ctrl.SetupSignalHandler()
 	storageProvider := mustInitStorage(ctx, storagePath, storageAdvAddr, artifactRetentionTTL, artifactRetentionRecords, artifactDigestAlgo, storageBackend, s3Bucket, s3Prefix, s3Region, s3Endpoint, s3ForcePathStyle)
-	
+
 	// Create legacy storage adapter for backwards compatibility
 	legacyStorage := storage.NewLegacyStorageAdapter(storageProvider, storagePath, storageAdvAddr)
 
@@ -480,7 +480,7 @@ func mustInitStorage(ctx context.Context, path string, storageAdvAddr string, ar
 		RetentionTTL:     artifactRetentionTTL,
 		RetentionRecords: artifactRetentionRecords,
 		// Filesystem config
-		FilesystemPath:   path,
+		FilesystemPath: path,
 		// S3 config
 		S3Bucket:         s3Bucket,
 		S3Prefix:         s3Prefix,

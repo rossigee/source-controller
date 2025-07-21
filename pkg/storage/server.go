@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-logr/logr"
 	v1 "github.com/fluxcd/source-controller/api/v1"
+	"github.com/go-logr/logr"
 )
 
 // ArtifactServer provides HTTP access to artifacts stored in any storage backend.
@@ -117,7 +117,7 @@ func (s *ArtifactServer) serveArtifact(w http.ResponseWriter, r *http.Request) {
 	// Set headers
 	w.Header().Set("Content-Type", "application/gzip")
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	
+
 	// Stream the content
 	if _, err := io.Copy(w, reader); err != nil {
 		s.logger.Error(err, "Failed to stream artifact", "path", path)

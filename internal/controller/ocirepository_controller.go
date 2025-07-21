@@ -30,6 +30,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
@@ -146,6 +147,7 @@ type OCIRepositoryReconciler struct {
 	requeueDependency time.Duration
 
 	patchOptions []patch.Option
+	failureTracker sync.Map // Track failure counts for exponential backoff per resource
 }
 
 type OCIRepositoryReconcilerOptions struct {
@@ -192,6 +194,12 @@ func (r *OCIRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	// Initialize the patch helper with the current version of the object.
 	serialPatcher := patch.NewSerialPatcher(obj, r.Client)
 
+	// Get failure count for this resource
+	failureCount := 0
+	if val, ok := r.failureTracker.Load(req.NamespacedName); ok {
+		failureCount = val.(int)
+	}
+
 	// recResult stores the abstracted reconcile result.
 	var recResult sreconcile.Result
 
@@ -209,12 +217,22 @@ func (r *OCIRepositoryReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 				summarize.ErrorActionHandler,
 				summarize.RecordReconcileReq,
 			),
-			summarize.WithResultBuilder(sreconcile.AlwaysRequeueResultBuilder{
+			summarize.WithResultBuilder(&sreconcile.ExponentialBackoffResultBuilder{
 				RequeueAfter: jitter.JitteredIntervalDuration(obj.GetRequeueAfter()),
+				MinBackoff:   5 * time.Second,
+				MaxBackoff:   15 * time.Minute,
+				FailureCount: failureCount,
 			}),
 			summarize.WithPatchFieldOwner(r.ControllerName),
 		}
 		result, retErr = summarizeHelper.SummarizeAndPatch(ctx, obj, summarizeOpts...)
+
+		// Update failure count based on result
+		if retErr != nil && !errors.Is(retErr, reconcile.TerminalError(nil)) {
+			r.failureTracker.Store(req.NamespacedName, failureCount+1)
+		} else if retErr == nil {
+			r.failureTracker.Delete(req.NamespacedName)
+		}
 
 		// Always record duration metrics.
 		r.Metrics.RecordDuration(ctx, obj, start)
@@ -347,10 +365,12 @@ func (r *OCIRepositoryReconciler) reconcileSource(ctx context.Context, sp *patch
 	// Generate the registry credential keychain either from static credentials or using cloud OIDC
 	keychain, err := r.keychain(ctx, obj)
 	if err != nil {
-		e := serror.NewGeneric(
+		// Authentication failures should use longer backoff to avoid hammering the API
+		e := serror.NewWaiting(
 			fmt.Errorf("failed to get credential: %w", err),
 			sourcev1.AuthenticationFailedReason,
 		)
+		e.RequeueAfter = 3 * time.Minute
 		conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason, "%s", e)
 		return sreconcile.ResultEmpty, e
 	}
@@ -396,10 +416,12 @@ func (r *OCIRepositoryReconciler) reconcileSource(ctx context.Context, sp *patch
 		var authErr error
 		authenticator, authErr = soci.OIDCAuth(ctxTimeout, obj.Spec.URL, obj.Spec.Provider, opts...)
 		if authErr != nil {
-			e := serror.NewGeneric(
+			// OIDC authentication failures should use longer backoff
+			e := serror.NewWaiting(
 				fmt.Errorf("failed to get credential from %s: %w", obj.Spec.Provider, authErr),
 				sourcev1.AuthenticationFailedReason,
 			)
+			e.RequeueAfter = 3 * time.Minute
 			conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason, "%s", e)
 			return sreconcile.ResultEmpty, e
 		}
@@ -537,6 +559,19 @@ func (r *OCIRepositoryReconciler) reconcileSource(ctx context.Context, sp *patch
 	switch obj.GetLayerOperation() {
 	case sourcev1.OCILayerExtract:
 		if err = tar.Untar(blob, dir, tar.WithMaxUntarSize(-1), tar.WithSkipSymlinks()); err != nil {
+			// Check if this is a gzip corruption error
+			if strings.Contains(err.Error(), "gzip: invalid header") || 
+			   strings.Contains(err.Error(), "requires gzip-compressed body") {
+				// This is likely a corrupted artifact, use longer backoff
+				e := serror.NewWaiting(
+					fmt.Errorf("artifact appears to be corrupted (gzip error): %w", err),
+					sourcev1.OCILayerOperationFailedReason,
+				)
+				e.RequeueAfter = 5 * time.Minute
+				conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason, 
+					"Artifact gzip corruption detected: %s. Will retry in 5 minutes.", err)
+				return sreconcile.ResultEmpty, e
+			}
 			e := serror.NewGeneric(
 				fmt.Errorf("failed to extract layer contents from artifact: %w", err),
 				sourcev1.OCILayerOperationFailedReason,

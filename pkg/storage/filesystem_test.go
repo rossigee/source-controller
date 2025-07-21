@@ -35,7 +35,7 @@ import (
 func TestFilesystemStorage_NewFilesystemStorage(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(storage).NotTo(BeNil())
@@ -47,7 +47,7 @@ func TestFilesystemStorage_StoreRetrieve(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
 	ctx := context.Background()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -55,28 +55,28 @@ func TestFilesystemStorage_StoreRetrieve(t *testing.T) {
 	artifact := &v1.Artifact{
 		Path: "test/artifact.tar.gz",
 	}
-	
+
 	// Test content
 	content := []byte("test content")
 	reader := bytes.NewReader(content)
-	
+
 	// Store artifact
 	err = storage.Store(ctx, artifact, reader)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(artifact.Digest).NotTo(BeEmpty())
 	g.Expect(artifact.Size).NotTo(BeNil())
 	g.Expect(*artifact.Size).To(Equal(int64(len(content))))
-	
+
 	// Check if artifact exists
 	exists, err := storage.Exists(ctx, artifact)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(exists).To(BeTrue())
-	
+
 	// Retrieve artifact
 	retrievedReader, err := storage.Retrieve(ctx, artifact)
 	g.Expect(err).NotTo(HaveOccurred())
 	defer retrievedReader.Close()
-	
+
 	retrievedContent, err := io.ReadAll(retrievedReader)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(retrievedContent).To(Equal(content))
@@ -86,7 +86,7 @@ func TestFilesystemStorage_Delete(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
 	ctx := context.Background()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -97,16 +97,16 @@ func TestFilesystemStorage_Delete(t *testing.T) {
 	content := []byte("test content")
 	err = storage.Store(ctx, artifact, bytes.NewReader(content))
 	g.Expect(err).NotTo(HaveOccurred())
-	
+
 	// Verify it exists
 	exists, err := storage.Exists(ctx, artifact)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(exists).To(BeTrue())
-	
+
 	// Delete artifact
 	err = storage.Delete(ctx, artifact)
 	g.Expect(err).NotTo(HaveOccurred())
-	
+
 	// Verify it's gone
 	exists, err = storage.Exists(ctx, artifact)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -117,14 +117,14 @@ func TestFilesystemStorage_GetURL(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
 	ctx := context.Background()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	artifact := &v1.Artifact{
 		Path: "test/artifact.tar.gz",
 	}
-	
+
 	url, err := storage.GetURL(ctx, artifact)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(url).To(Equal("http://test.local/test/artifact.tar.gz"))
@@ -133,7 +133,7 @@ func TestFilesystemStorage_GetURL(t *testing.T) {
 func TestFilesystemStorage_NewArtifactFor(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -141,7 +141,7 @@ func TestFilesystemStorage_NewArtifactFor(t *testing.T) {
 		Name:      "test-repo",
 		Namespace: "default",
 	}
-	
+
 	artifact := storage.NewArtifactFor("GitRepository", metadata, "abc123", "latest.tar.gz")
 	g.Expect(artifact.Path).To(Equal("gitrepository/default/test-repo/latest.tar.gz"))
 	g.Expect(artifact.Revision).To(Equal("abc123"))
@@ -151,7 +151,7 @@ func TestFilesystemStorage_Archive(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
 	ctx := context.Background()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -159,20 +159,20 @@ func TestFilesystemStorage_Archive(t *testing.T) {
 	sourceDir := filepath.Join(tempDir, "source")
 	err = os.MkdirAll(sourceDir, 0755)
 	g.Expect(err).NotTo(HaveOccurred())
-	
+
 	testFile := filepath.Join(sourceDir, "test.txt")
 	err = os.WriteFile(testFile, []byte("test content"), 0644)
 	g.Expect(err).NotTo(HaveOccurred())
-	
+
 	// Create artifact
 	artifact := &v1.Artifact{
 		Path: "test/archive.tar.gz",
 	}
-	
+
 	// Create the artifact directory structure first
 	err = storage.Storage.MkdirAll(*artifact)
 	g.Expect(err).NotTo(HaveOccurred())
-	
+
 	// Archive the directory
 	opts := ArchiveOptions{
 		SourcePath: sourceDir,
@@ -180,7 +180,7 @@ func TestFilesystemStorage_Archive(t *testing.T) {
 			return strings.HasSuffix(path, ".ignore")
 		},
 	}
-	
+
 	err = storage.Archive(ctx, artifact, opts)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(artifact.Digest).NotTo(BeEmpty())
@@ -192,7 +192,7 @@ func TestFilesystemStorage_Healthy(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
 	ctx := context.Background()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 
@@ -204,22 +204,22 @@ func TestFilesystemStorage_Lock(t *testing.T) {
 	g := NewWithT(t)
 	tempDir := t.TempDir()
 	ctx := context.Background()
-	
+
 	storage, err := NewFilesystemStorage(tempDir, "test.local", time.Minute, 2)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	artifact := &v1.Artifact{
 		Path: "test/artifact.tar.gz",
 	}
-	
+
 	// Create the artifact directory structure first
 	err = storage.Storage.MkdirAll(*artifact)
 	g.Expect(err).NotTo(HaveOccurred())
-	
+
 	unlock, err := storage.Lock(ctx, artifact)
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(unlock).NotTo(BeNil())
-	
+
 	// Unlock
 	unlock()
 }

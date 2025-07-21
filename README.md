@@ -12,6 +12,22 @@ The source-controller implements the
 [source.toolkit.fluxcd.io](docs/spec/README.md) API
 and is a core component of the [GitOps toolkit](https://fluxcd.io/flux/components/).
 
+## Known Issues
+
+### Double HTTP Prefix Bug in --storage-adv-addr
+
+**Bug**: When using `--storage-adv-addr` with an `http://` or `https://` prefix, the source-controller blindly prepends another `http://` prefix to artifact URLs, resulting in malformed URLs like `http://http://hostname:port/path`.
+
+**Example**: 
+- Config: `--storage-adv-addr=http://source-controller.flux-system.svc.cluster.local:9090`
+- Result: `http://http://source-controller.flux-system.svc.cluster.local:9090/helmchart/...`
+
+**Workaround**: Omit the protocol prefix:
+- Config: `--storage-adv-addr=source-controller.flux-system.svc.cluster.local:9090`
+- Result: `http://source-controller.flux-system.svc.cluster.local:9090/helmchart/...`
+
+**Fix Needed**: The source-controller should detect existing `http://` or `https://` prefixes in `--storage-adv-addr` and avoid double-prefixing.
+
 ![overview](docs/diagrams/source-controller-overview.png)
 
 ## APIs

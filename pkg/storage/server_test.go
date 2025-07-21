@@ -25,8 +25,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	. "github.com/onsi/gomega"
 	"github.com/go-logr/logr"
+	. "github.com/onsi/gomega"
 
 	v1 "github.com/fluxcd/source-controller/api/v1"
 )
@@ -101,16 +101,16 @@ func (m *mockStorageProvider) Healthy(ctx context.Context) error {
 func TestArtifactServer_ServeArtifact(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.Background()
-	
+
 	provider := newMockStorageProvider()
 	server := NewArtifactServer(ctx, provider, logr.Discard())
-	
+
 	// Store test artifact
 	artifact := &v1.Artifact{Path: "test/artifact.tar.gz"}
 	testContent := []byte("test content")
 	err := provider.Store(ctx, artifact, bytes.NewReader(testContent))
 	g.Expect(err).NotTo(HaveOccurred())
-	
+
 	tests := []struct {
 		name           string
 		method         string
@@ -151,22 +151,22 @@ func TestArtifactServer_ServeArtifact(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
-			
+
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			w := httptest.NewRecorder()
-			
+
 			server.Handler().ServeHTTP(w, req)
-			
+
 			g.Expect(w.Code).To(Equal(tt.expectedStatus))
-			
+
 			if tt.expectedBody != "" {
 				g.Expect(w.Body.String()).To(Equal(tt.expectedBody))
 			}
-			
+
 			if tt.method == "GET" && tt.expectedStatus == http.StatusOK {
 				g.Expect(w.Header().Get("Content-Type")).To(Equal("application/gzip"))
 			}
@@ -176,7 +176,7 @@ func TestArtifactServer_ServeArtifact(t *testing.T) {
 
 func TestArtifactServer_HealthCheck(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name           string
 		healthy        bool
@@ -195,23 +195,23 @@ func TestArtifactServer_HealthCheck(t *testing.T) {
 			expectedStatus: http.StatusServiceUnavailable,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
-			
+
 			provider := newMockStorageProvider()
 			provider.healthy = tt.healthy
-			
+
 			server := NewArtifactServer(ctx, provider, logr.Discard())
-			
+
 			req := httptest.NewRequest("GET", "/health", nil)
 			w := httptest.NewRecorder()
-			
+
 			server.Handler().ServeHTTP(w, req)
-			
+
 			g.Expect(w.Code).To(Equal(tt.expectedStatus))
-			
+
 			if tt.expectedBody != "" {
 				g.Expect(w.Body.String()).To(Equal(tt.expectedBody))
 			}
@@ -222,18 +222,18 @@ func TestArtifactServer_HealthCheck(t *testing.T) {
 func TestArtifactServer_S3Redirect(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.Background()
-	
+
 	// Create S3 storage (this will fail to connect but that's ok for the redirect test)
 	s3Storage := &S3Storage{}
 	server := NewArtifactServer(ctx, s3Storage, logr.Discard())
-	
+
 	req := httptest.NewRequest("GET", "/test/artifact.tar.gz", nil)
 	w := httptest.NewRecorder()
-	
+
 	// This will fail because we don't have a real S3 connection,
 	// but we can test the type detection logic
 	server.Handler().ServeHTTP(w, req)
-	
+
 	// We expect an error because the S3 client isn't configured,
 	// but this tests that the S3 redirect path is taken
 	g.Expect(w.Code).To(Equal(http.StatusInternalServerError))
@@ -242,10 +242,10 @@ func TestArtifactServer_S3Redirect(t *testing.T) {
 func TestNewArtifactServer(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.Background()
-	
+
 	provider := newMockStorageProvider()
 	server := NewArtifactServer(ctx, provider, logr.Discard())
-	
+
 	g.Expect(server).NotTo(BeNil())
 	g.Expect(server.provider).To(Equal(provider))
 	g.Expect(server.ctx).To(Equal(ctx))

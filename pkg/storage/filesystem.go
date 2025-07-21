@@ -103,7 +103,7 @@ func (fs *FilesystemStorage) GetURL(ctx context.Context, artifact *v1.Artifact) 
 // List returns artifacts matching the filter criteria.
 func (fs *FilesystemStorage) List(ctx context.Context, filter ArtifactFilter) ([]*v1.Artifact, error) {
 	var artifacts []*v1.Artifact
-	
+
 	basePath := fs.Storage.BasePath
 	if filter.Kind != "" {
 		basePath = filepath.Join(basePath, filter.Kind)
@@ -141,7 +141,7 @@ func (fs *FilesystemStorage) List(ctx context.Context, filter ArtifactFilter) ([
 			LastUpdateTime: metav1.NewTime(info.ModTime()),
 		}
 		fs.Storage.SetArtifactURL(artifact)
-		
+
 		artifacts = append(artifacts, artifact)
 		return nil
 	})

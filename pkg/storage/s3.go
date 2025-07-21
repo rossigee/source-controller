@@ -45,7 +45,7 @@ type S3Storage struct {
 	prefix        string
 	hostname      string
 	urlExpiration time.Duration
-	
+
 	// Lock management
 	locks sync.Map
 }
@@ -73,7 +73,7 @@ func NewS3Storage(ctx context.Context, cfg S3Config) (*S3Storage, error) {
 	// Determine endpoint
 	endpoint := cfg.Endpoint
 	secure := true
-	
+
 	if endpoint == "" {
 		// Default to AWS S3
 		endpoint = "s3.amazonaws.com"
@@ -124,13 +124,13 @@ func (s *S3Storage) Store(ctx context.Context, artifact *v1.Artifact, reader io.
 	var buf bytes.Buffer
 	sz := &writeCounter{}
 	mw := io.MultiWriter(d.Hash(), &buf, sz)
-	
+
 	if _, err := io.Copy(mw, reader); err != nil {
 		return fmt.Errorf("failed to read content: %w", err)
 	}
 
 	key := s.artifactKey(artifact)
-	
+
 	// Upload to S3 using MinIO client
 	_, err := s.client.PutObject(ctx, s.bucket, key, bytes.NewReader(buf.Bytes()), int64(buf.Len()),
 		minio.PutObjectOptions{
@@ -156,7 +156,7 @@ func (s *S3Storage) Store(ctx context.Context, artifact *v1.Artifact, reader io.
 // Retrieve returns a reader for the artifact content from S3.
 func (s *S3Storage) Retrieve(ctx context.Context, artifact *v1.Artifact) (io.ReadCloser, error) {
 	key := s.artifactKey(artifact)
-	
+
 	obj, err := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object from S3: %w", err)
@@ -168,7 +168,7 @@ func (s *S3Storage) Retrieve(ctx context.Context, artifact *v1.Artifact) (io.Rea
 // Exists checks if an artifact exists in S3.
 func (s *S3Storage) Exists(ctx context.Context, artifact *v1.Artifact) (bool, error) {
 	key := s.artifactKey(artifact)
-	
+
 	_, err := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
 	if err != nil {
 		// Check if it's a not found error
@@ -185,7 +185,7 @@ func (s *S3Storage) Exists(ctx context.Context, artifact *v1.Artifact) (bool, er
 // Delete removes an artifact from S3.
 func (s *S3Storage) Delete(ctx context.Context, artifact *v1.Artifact) error {
 	key := s.artifactKey(artifact)
-	
+
 	err := s.client.RemoveObject(ctx, s.bucket, key, minio.RemoveObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to delete object from S3: %w", err)
@@ -197,7 +197,7 @@ func (s *S3Storage) Delete(ctx context.Context, artifact *v1.Artifact) error {
 // GetURL returns a pre-signed URL for the artifact.
 func (s *S3Storage) GetURL(ctx context.Context, artifact *v1.Artifact) (string, error) {
 	key := s.artifactKey(artifact)
-	
+
 	// Generate pre-signed URL
 	url, err := s.client.PresignedGetObject(ctx, s.bucket, key, s.urlExpiration, nil)
 	if err != nil {
@@ -213,7 +213,7 @@ func (s *S3Storage) List(ctx context.Context, filter ArtifactFilter) ([]*v1.Arti
 	if prefix != "" {
 		prefix += "/"
 	}
-	
+
 	// Build prefix based on filter
 	if filter.Kind != "" {
 		prefix += filter.Kind + "/"
@@ -226,7 +226,7 @@ func (s *S3Storage) List(ctx context.Context, filter ArtifactFilter) ([]*v1.Arti
 	}
 
 	var artifacts []*v1.Artifact
-	
+
 	// List objects with prefix
 	objectCh := s.client.ListObjects(ctx, s.bucket, minio.ListObjectsOptions{
 		Prefix:    prefix,
@@ -248,12 +248,12 @@ func (s *S3Storage) List(ctx context.Context, filter ArtifactFilter) ([]*v1.Arti
 		if s.prefix != "" {
 			path = strings.TrimPrefix(path, s.prefix+"/")
 		}
-		
+
 		artifact := &v1.Artifact{
 			Path:           path,
 			LastUpdateTime: metav1.NewTime(object.LastModified),
 		}
-		
+
 		size := object.Size
 		artifact.Size = &size
 
@@ -307,15 +307,15 @@ func (s *S3Storage) GarbageCollect(ctx context.Context, filter ArtifactFilter, p
 // Lock acquires an exclusive lock for the artifact.
 func (s *S3Storage) Lock(ctx context.Context, artifact *v1.Artifact) (unlock func(), err error) {
 	key := s.artifactKey(artifact)
-	
+
 	// Use in-memory locks for now
 	// In production, this should use S3 object locks or DynamoDB
 	mu := &sync.Mutex{}
 	actual, _ := s.locks.LoadOrStore(key, mu)
 	mu = actual.(*sync.Mutex)
-	
+
 	mu.Lock()
-	
+
 	return func() {
 		mu.Unlock()
 	}, nil
@@ -329,7 +329,7 @@ func (s *S3Storage) Healthy(ctx context.Context) error {
 		MaxKeys:   1,
 		Recursive: false,
 	})
-	
+
 	// Consume at least one item from channel to check for errors
 	for object := range objectCh {
 		if object.Err != nil {
@@ -337,7 +337,7 @@ func (s *S3Storage) Healthy(ctx context.Context) error {
 		}
 		break
 	}
-	
+
 	return nil
 }
 
@@ -354,11 +354,11 @@ func (s *S3Storage) NewArtifactFor(kind string, metadata metav1.Object, revision
 // Archive creates a tar.gz archive from the source directory and stores it.
 func (s *S3Storage) Archive(ctx context.Context, artifact *v1.Artifact, opts ArchiveOptions) error {
 	var buf bytes.Buffer
-	
+
 	// Create gzip writer
 	gw := gzip.NewWriter(&buf)
 	tw := tar.NewWriter(gw)
-	
+
 	// Walk the source directory
 	err := filepath.Walk(opts.SourcePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
