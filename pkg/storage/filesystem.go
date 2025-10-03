@@ -184,6 +184,12 @@ func (fs *FilesystemStorage) Healthy(ctx context.Context) error {
 	return nil
 }
 
+// ResolvePseudoSymlink resolves a JSON pseudo-symlink and returns the target URL.
+// For filesystem storage, this method returns an error as traditional symlinks should be used instead.
+func (fs *FilesystemStorage) ResolvePseudoSymlink(ctx context.Context, linkPath string) (string, error) {
+	return "", fmt.Errorf("pseudo-symlinks not supported for filesystem storage, use traditional symlinks")
+}
+
 // NewArtifactFor creates a new artifact with proper path and metadata.
 func (fs *FilesystemStorage) NewArtifactFor(kind string, metadata metav1.Object, revision, fileName string) v1.Artifact {
 	return fs.Storage.NewArtifactFor(kind, metadata, revision, fileName)

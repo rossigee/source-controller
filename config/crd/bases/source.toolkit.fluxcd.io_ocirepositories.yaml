@@ -54,6 +54,19 @@ spec:
           spec:
             description: OCIRepositorySpec defines the desired state of OCIRepository
             properties:
+              certConfigMapRef:
+                description: |-
+                  CertConfigMapRef specifies the ConfigMap containing the CA certificate
+                  to trust while connecting to the OCI registry over HTTPS.
+                  The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+                  This field takes precedence over any CA certificate specified in CertSecretRef.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    type: string
+                required:
+                - name
+                type: object
               certSecretRef:
                 description: |-
                   CertSecretRef can be given the name of a Secret containing

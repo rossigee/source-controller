@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Fork Management Strategy
+
+This repository follows a sophisticated fork management strategy to maintain custom features while minimizing drift from upstream:
+
+### Branch Structure
+- **`main`**: Tracks upstream/main with minimal changes
+- **`develop`**: Custom features and enhancements on top of main
+- **Feature branches**: Created from main for upstream contributions
+
+### Workflow for Upstream Contributions
+1. **Branch from main**: `git checkout main && git checkout -b fix/upstream-issue`
+2. **Implement fix**: Work on bug fixes or improvements suitable for upstream
+3. **Test locally**: Ensure changes work with current codebase
+4. **Submit upstream PR**: Propose changes to original Flux repository
+5. **Merge upstream to main**: `git checkout main && git merge upstream/main`
+6. **Merge to develop**: `git checkout develop && git merge main`
+
+This approach ensures:
+- Clean upstream contributions from a current main branch
+- Custom features remain in develop branch
+- Minimal maintenance overhead when rebasing custom features
+- Clear separation between upstream and custom functionality
+
 ## Project Overview
 
 The source-controller is a Kubernetes operator in the Flux CD GitOps toolkit that specializes in artifact acquisition from external sources (Git repositories, OCI registries, Helm repositories, S3-compatible buckets). It reconciles source objects and makes their artifacts available via an HTTP file server.

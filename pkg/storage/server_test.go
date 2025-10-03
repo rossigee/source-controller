@@ -98,12 +98,16 @@ func (m *mockStorageProvider) Healthy(ctx context.Context) error {
 	return nil
 }
 
+func (m *mockStorageProvider) ResolvePseudoSymlink(ctx context.Context, linkPath string) (string, error) {
+	return "", nil
+}
+
 func TestArtifactServer_ServeArtifact(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.Background()
 
 	provider := newMockStorageProvider()
-	server := NewArtifactServer(ctx, provider, logr.Discard())
+	server := NewArtifactServer(provider, logr.Discard())
 
 	// Store test artifact
 	artifact := &v1.Artifact{Path: "test/artifact.tar.gz"}
@@ -175,8 +179,6 @@ func TestArtifactServer_ServeArtifact(t *testing.T) {
 }
 
 func TestArtifactServer_HealthCheck(t *testing.T) {
-	ctx := context.Background()
-
 	tests := []struct {
 		name           string
 		healthy        bool
@@ -203,7 +205,7 @@ func TestArtifactServer_HealthCheck(t *testing.T) {
 			provider := newMockStorageProvider()
 			provider.healthy = tt.healthy
 
-			server := NewArtifactServer(ctx, provider, logr.Discard())
+			server := NewArtifactServer(provider, logr.Discard())
 
 			req := httptest.NewRequest("GET", "/health", nil)
 			w := httptest.NewRecorder()
@@ -221,11 +223,10 @@ func TestArtifactServer_HealthCheck(t *testing.T) {
 
 func TestArtifactServer_S3Redirect(t *testing.T) {
 	g := NewWithT(t)
-	ctx := context.Background()
 
 	// Create S3 storage (this will fail to connect but that's ok for the redirect test)
 	s3Storage := &S3Storage{}
-	server := NewArtifactServer(ctx, s3Storage, logr.Discard())
+	server := NewArtifactServer(s3Storage, logr.Discard())
 
 	req := httptest.NewRequest("GET", "/test/artifact.tar.gz", nil)
 	w := httptest.NewRecorder()
@@ -241,12 +242,10 @@ func TestArtifactServer_S3Redirect(t *testing.T) {
 
 func TestNewArtifactServer(t *testing.T) {
 	g := NewWithT(t)
-	ctx := context.Background()
 
 	provider := newMockStorageProvider()
-	server := NewArtifactServer(ctx, provider, logr.Discard())
+	server := NewArtifactServer(provider, logr.Discard())
 
 	g.Expect(server).NotTo(BeNil())
 	g.Expect(server.provider).To(Equal(provider))
-	g.Expect(server.ctx).To(Equal(ctx))
 }

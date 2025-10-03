@@ -19,15 +19,18 @@ package tls
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net/url"
+	"reflect"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Test_tlsClientConfigFromSecret(t *testing.T) {
@@ -185,5 +188,149 @@ func validTlsSecret(t *testing.T, kubernetesTlsKeys bool) corev1.Secret {
 			pkKey:  []byte(keyPem),
 			caKey:  []byte(caPem),
 		},
+	}
+}
+
+func TestCAFromConfigMap(t *testing.T) {
+	// Generate a valid CA certificate using the existing test helper
+	testSecret := validTlsSecret(t, true)
+	tlsCA := string(testSecret.Data[CACrtKey])
+
+	tests := []struct {
+		name      string
+		configMap corev1.ConfigMap
+		want      []byte
+		wantErr   bool
+	}{
+		{
+			name: "valid CA certificate",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ca-cert",
+				},
+				Data: map[string]string{
+					"ca.crt": tlsCA,
+				},
+			},
+			want:    []byte(tlsCA),
+			wantErr: false,
+		},
+		{
+			name: "missing ca.crt key",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ca-cert",
+				},
+				Data: map[string]string{
+					"other.crt": tlsCA,
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "empty ca.crt key",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ca-cert",
+				},
+				Data: map[string]string{
+					"ca.crt": "",
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := CAFromConfigMap(tt.configMap)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CAFromConfigMap() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CAFromConfigMap() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTLSClientConfigWithCA(t *testing.T) {
+	// Generate a valid CA certificate using the existing test helper
+	testSecret := validTlsSecret(t, true)
+	tlsCA := string(testSecret.Data[CACrtKey])
+
+	tests := []struct {
+		name     string
+		caBytes  []byte
+		url      string
+		wantErr  bool
+		checkTLS bool
+	}{
+		{
+			name:     "valid CA certificate",
+			caBytes:  []byte(tlsCA),
+			url:      "https://example.com",
+			wantErr:  false,
+			checkTLS: true,
+		},
+		{
+			name:     "valid CA certificate without URL",
+			caBytes:  []byte(tlsCA),
+			url:      "",
+			wantErr:  false,
+			checkTLS: true,
+		},
+		{
+			name:     "empty CA bytes",
+			caBytes:  []byte{},
+			url:      "https://example.com",
+			wantErr:  true,
+			checkTLS: false,
+		},
+		{
+			name:     "invalid CA certificate",
+			caBytes:  []byte("invalid cert data"),
+			url:      "https://example.com",
+			wantErr:  true,
+			checkTLS: false,
+		},
+		{
+			name:     "invalid URL",
+			caBytes:  []byte(tlsCA),
+			url:      ":::invalid-url",
+			wantErr:  true,
+			checkTLS: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := TLSClientConfigWithCA(tt.caBytes, tt.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TLSClientConfigWithCA() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.checkTLS {
+				if got == nil {
+					t.Error("TLSClientConfigWithCA() returned nil config")
+					return
+				}
+				if got.MinVersion != tls.VersionTLS12 {
+					t.Errorf("TLSClientConfigWithCA() MinVersion = %v, want %v", got.MinVersion, tls.VersionTLS12)
+				}
+				if got.RootCAs == nil {
+					t.Error("TLSClientConfigWithCA() RootCAs is nil")
+				}
+				if tt.url != "" {
+					expectedServerName := "example.com"
+					if got.ServerName != expectedServerName {
+						t.Errorf("TLSClientConfigWithCA() ServerName = %v, want %v", got.ServerName, expectedServerName)
+					}
+				}
+			}
+		})
 	}
 }

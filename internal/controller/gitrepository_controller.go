@@ -131,7 +131,7 @@ type GitRepositoryReconciler struct {
 	kuberecorder.EventRecorder
 	helper.Metrics
 
-	Storage        *Storage
+	Storage        StorageInterface
 	ControllerName string
 	TokenCache     *cache.TokenCache
 

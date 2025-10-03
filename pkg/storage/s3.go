@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -85,6 +86,8 @@ func NewS3Storage(ctx context.Context, cfg S3Config) (*S3Storage, error) {
 		}
 	}
 
+	fmt.Printf("S3Storage: Creating MinIO client - endpoint=%s, secure=%v, bucket=%s, region=%s\n", endpoint, secure, cfg.Bucket, cfg.Region)
+
 	// Create MinIO client
 	minioClient, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewEnvAWS(),
@@ -94,6 +97,8 @@ func NewS3Storage(ctx context.Context, cfg S3Config) (*S3Storage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create MinIO client: %w", err)
 	}
+
+	fmt.Printf("S3Storage: Checking if bucket exists: %s\n", cfg.Bucket)
 
 	// Check if bucket exists
 	exists, err := minioClient.BucketExists(ctx, cfg.Bucket)
@@ -339,6 +344,37 @@ func (s *S3Storage) Healthy(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// ResolvePseudoSymlink resolves a JSON pseudo-symlink and returns the target URL.
+func (s *S3Storage) ResolvePseudoSymlink(ctx context.Context, linkPath string) (string, error) {
+	// Check if this is a pseudo-symlink file
+	if !strings.HasSuffix(linkPath, ".redirect.json") {
+		return "", fmt.Errorf("not a pseudo-symlink file: %s", linkPath)
+	}
+
+	// Create artifact for the symlink file
+	linkArtifact := &v1.Artifact{
+		Path: linkPath,
+	}
+
+	// Read the pseudo-symlink data
+	reader, err := s.Retrieve(ctx, linkArtifact)
+	if err != nil {
+		return "", fmt.Errorf("failed to read pseudo-symlink: %w", err)
+	}
+	defer reader.Close()
+
+	// Parse the JSON
+	var pseudoLink struct {
+		Target    string    `json:"target"`
+		CreatedAt time.Time `json:"created_at"`
+	}
+	if err := json.NewDecoder(reader).Decode(&pseudoLink); err != nil {
+		return "", fmt.Errorf("failed to parse pseudo-symlink: %w", err)
+	}
+
+	return pseudoLink.Target, nil
 }
 
 // NewArtifactFor creates a new artifact with proper path and metadata.

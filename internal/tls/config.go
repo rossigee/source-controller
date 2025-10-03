@@ -159,3 +159,51 @@ func tlsClientConfigFromSecret(secret corev1.Secret, url string, kubernetesTLSKe
 		CABytes:   caBytes,
 	}, nil
 }
+
+// CAFromConfigMap extracts the CA certificate from a ConfigMap.
+// The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+func CAFromConfigMap(configMap corev1.ConfigMap) ([]byte, error) {
+	caData, exists := configMap.Data[CACrtKey]
+	if !exists {
+		return nil, fmt.Errorf("ConfigMap '%s' does not contain '%s' key", configMap.Name, CACrtKey)
+	}
+
+	if caData == "" {
+		return nil, fmt.Errorf("ConfigMap '%s' contains empty '%s' key", configMap.Name, CACrtKey)
+	}
+
+	return []byte(caData), nil
+}
+
+// TLSClientConfigWithCA creates a TLS client config with the provided CA certificate.
+// This is a utility function to create TLS config when CA data is obtained separately
+// (e.g., from ConfigMaps or combined from multiple sources).
+func TLSClientConfigWithCA(caBytes []byte, url string) (*tls.Config, error) {
+	if len(caBytes) == 0 {
+		return nil, fmt.Errorf("CA certificate bytes are empty")
+	}
+
+	cp, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, fmt.Errorf("cannot retrieve system certificate pool: %w", err)
+	}
+
+	if !cp.AppendCertsFromPEM(caBytes) {
+		return nil, fmt.Errorf("cannot append certificate into certificate pool: invalid CA certificate")
+	}
+
+	tlsConf := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    cp,
+	}
+
+	if url != "" {
+		u, err := neturl.Parse(url)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse repository URL: %w", err)
+		}
+		tlsConf.ServerName = u.Hostname()
+	}
+
+	return tlsConf, nil
+}

@@ -47,6 +47,9 @@ import (
 
 const GarbageCountLimit = 1000
 
+// Ensure Storage implements StorageInterface
+var _ StorageInterface = (*Storage)(nil)
+
 const (
 	// defaultFileMode is the permission mode applied to files inside an artifact archive.
 	defaultFileMode int64 = 0o600
@@ -57,6 +60,7 @@ const (
 )
 
 // Storage manages artifacts
+// It implements StorageInterface for filesystem-based storage.
 type Storage struct {
 	// BasePath is the local directory path where the source artifacts are stored.
 	BasePath string `json:"basePath"`

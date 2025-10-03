@@ -219,9 +219,11 @@ func main() {
 	eventRecorder := mustSetupEventRecorder(mgr, eventsAddr, controllerName)
 
 	ctx := ctrl.SetupSignalHandler()
+	setupLog.Info("storage configuration", "storageAddr", storageAddr, "storageAdvAddr", storageAdvAddr)
 	storageProvider := mustInitStorage(ctx, storagePath, storageAdvAddr, artifactRetentionTTL, artifactRetentionRecords, artifactDigestAlgo, storageBackend, s3Bucket, s3Prefix, s3Region, s3Endpoint, s3ForcePathStyle)
 
 	// Create legacy storage adapter for backwards compatibility
+	setupLog.Info("creating legacy storage adapter", "storageAdvAddr", storageAdvAddr)
 	legacyStorage := storage.NewLegacyStorageAdapter(storageProvider, storagePath, storageAdvAddr)
 
 	mustSetupHelmLimits(helmIndexLimit, helmChartLimit, helmChartFileLimit)
@@ -321,7 +323,7 @@ func main() {
 	// Start the distributed artifact server
 	// This can run on all pods, not just the leader!
 	go func() {
-		artifactServer := storage.NewArtifactServer(ctx, storageProvider, setupLog.WithName("artifact-server"))
+		artifactServer := storage.NewArtifactServer(storageProvider, setupLog.WithName("artifact-server"))
 		if err := artifactServer.ListenAndServe(storageAddr); err != nil && err != http.ErrServerClosed {
 			setupLog.Error(err, "artifact server error")
 			os.Exit(1)
@@ -464,6 +466,8 @@ func mustInitStorage(ctx context.Context, path string, storageAdvAddr string, ar
 	// storageAdvAddr is already set properly by the caller
 	// No need to call determineAdvStorageAddr here
 
+	setupLog.Info("initializing storage", "backend", backend, "path", path, "s3Bucket", s3Bucket, "s3Endpoint", s3Endpoint)
+
 	if artifactDigestAlgo != intdigest.Canonical.String() {
 		algo, err := intdigest.AlgorithmForName(artifactDigestAlgo)
 		if err != nil {
@@ -490,11 +494,16 @@ func mustInitStorage(ctx context.Context, path string, storageAdvAddr string, ar
 		S3URLExpiration:  15 * time.Minute,
 	}
 
+	setupLog.Info("creating storage provider", "config", fmt.Sprintf("%+v", cfg))
+
 	provider, err := storage.NewProvider(ctx, cfg)
 	if err != nil {
 		setupLog.Error(err, "unable to initialise storage provider")
 		os.Exit(1)
 	}
+
+	setupLog.Info("storage provider created successfully", "type", fmt.Sprintf("%T", provider))
+
 	return provider
 }
 

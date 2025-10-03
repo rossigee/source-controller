@@ -132,7 +132,7 @@ type HelmChartReconciler struct {
 	helper.Metrics
 
 	RegistryClientGenerator RegistryClientGeneratorFunc
-	Storage                 *Storage
+	Storage                 StorageInterface
 	Getters                 helmgetter.Providers
 	ControllerName          string
 

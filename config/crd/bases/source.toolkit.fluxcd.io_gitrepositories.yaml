@@ -56,6 +56,19 @@ spec:
               GitRepositorySpec specifies the required configuration to produce an
               Artifact for a Git repository.
             properties:
+              certConfigMapRef:
+                description: |-
+                  CertConfigMapRef specifies the ConfigMap containing the CA certificate
+                  to trust while connecting to the Git repository over HTTPS.
+                  The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+                  This field takes precedence over any CA certificate specified in SecretRef.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    type: string
+                required:
+                - name
+                type: object
               ignore:
                 description: |-
                   Ignore overrides the set of excluded patterns in the .sourceignore format

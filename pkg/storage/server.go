@@ -34,15 +34,13 @@ import (
 type ArtifactServer struct {
 	provider Interface
 	logger   logr.Logger
-	ctx      context.Context
 }
 
 // NewArtifactServer creates a new artifact server.
-func NewArtifactServer(ctx context.Context, provider Interface, logger logr.Logger) *ArtifactServer {
+func NewArtifactServer(provider Interface, logger logr.Logger) *ArtifactServer {
 	return &ArtifactServer{
 		provider: provider,
 		logger:   logger,
-		ctx:      ctx,
 	}
 }
 
@@ -73,8 +71,11 @@ func (s *ArtifactServer) serveArtifact(w http.ResponseWriter, r *http.Request) {
 		Path: path,
 	}
 
+	// Use request context for all operations
+	ctx := r.Context()
+
 	// Check if artifact exists
-	exists, err := s.provider.Exists(s.ctx, artifact)
+	exists, err := s.provider.Exists(ctx, artifact)
 	if err != nil {
 		s.logger.Error(err, "Failed to check artifact existence", "path", path)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -92,9 +93,22 @@ func (s *ArtifactServer) serveArtifact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if this is a pseudo-symlink file and resolve it
+	if strings.HasSuffix(path, ".redirect.json") {
+		targetURL, err := s.provider.ResolvePseudoSymlink(ctx, path)
+		if err != nil {
+			s.logger.Error(err, "Failed to resolve pseudo-symlink", "path", path)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+		// Redirect to the target URL
+		http.Redirect(w, r, targetURL, http.StatusTemporaryRedirect)
+		return
+	}
+
 	// For S3 backend, we can redirect to pre-signed URL
 	if _, ok := s.provider.(*S3Storage); ok {
-		url, err := s.provider.GetURL(s.ctx, artifact)
+		url, err := s.provider.GetURL(ctx, artifact)
 		if err != nil {
 			s.logger.Error(err, "Failed to get artifact URL", "path", path)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -106,7 +120,7 @@ func (s *ArtifactServer) serveArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// For other backends, stream the content
-	reader, err := s.provider.Retrieve(s.ctx, artifact)
+	reader, err := s.provider.Retrieve(ctx, artifact)
 	if err != nil {
 		s.logger.Error(err, "Failed to retrieve artifact", "path", path)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -128,7 +142,7 @@ func (s *ArtifactServer) serveArtifact(w http.ResponseWriter, r *http.Request) {
 
 // healthCheck handles health check requests.
 func (s *ArtifactServer) healthCheck(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
 	if err := s.provider.Healthy(ctx); err != nil {

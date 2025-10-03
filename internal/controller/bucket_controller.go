@@ -58,7 +58,7 @@ import (
 	"github.com/fluxcd/source-controller/internal/index"
 	sreconcile "github.com/fluxcd/source-controller/internal/reconcile"
 	"github.com/fluxcd/source-controller/internal/reconcile/summarize"
-	"github.com/fluxcd/source-controller/internal/tls"
+	tlsutil "github.com/fluxcd/source-controller/internal/tls"
 	"github.com/fluxcd/source-controller/pkg/azure"
 	"github.com/fluxcd/source-controller/pkg/gcp"
 	"github.com/fluxcd/source-controller/pkg/minio"
@@ -123,7 +123,7 @@ type BucketReconciler struct {
 	kuberecorder.EventRecorder
 	helper.Metrics
 
-	Storage        *Storage
+	Storage        StorageInterface
 	ControllerName string
 
 	patchOptions []patch.Option
@@ -480,7 +480,7 @@ func (r *BucketReconciler) reconcileSource(ctx context.Context, sp *patch.Serial
 			conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason, "%s", e)
 			return sreconcile.ResultEmpty, e
 		}
-		tlsConfig, err := r.getTLSConfig(ctx, obj.Spec.CertSecretRef, obj.GetNamespace(), obj.Spec.Endpoint)
+		tlsConfig, err := r.getTLSConfigFromRefs(ctx, obj.Spec.CertConfigMapRef, obj.Spec.CertSecretRef, obj.GetNamespace(), obj.Spec.Endpoint)
 		if err != nil {
 			e := serror.NewGeneric(err, sourcev1.AuthenticationFailedReason)
 			conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason, "%s", e)
@@ -753,6 +753,38 @@ func (r *BucketReconciler) getSecret(ctx context.Context, secretRef *meta.LocalO
 	return secret, nil
 }
 
+// getTLSConfigFromRefs attempts to fetch a TLS configuration from either ConfigMap or Secret references.
+// ConfigMap takes precedence if both are specified.
+func (r *BucketReconciler) getTLSConfigFromRefs(ctx context.Context,
+	configMapRef, secretRef *meta.LocalObjectReference, namespace, endpoint string) (*stdtls.Config, error) {
+	// Check ConfigMap first (takes precedence)
+	if configMapRef != nil && configMapRef.Name != "" {
+		configMapName := types.NamespacedName{
+			Namespace: namespace,
+			Name:      configMapRef.Name,
+		}
+		var configMap corev1.ConfigMap
+		if err := r.Get(ctx, configMapName, &configMap); err != nil {
+			return nil, fmt.Errorf("failed to get TLS ConfigMap: %w", err)
+		}
+
+		caBytes, err := tlsutil.CAFromConfigMap(configMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract CA certificate from ConfigMap: %w", err)
+		}
+
+		tlsConfig, err := tlsutil.TLSClientConfigWithCA(caBytes, endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TLS config from ConfigMap: %w", err)
+		}
+
+		return tlsConfig, nil
+	}
+
+	// Fall back to Secret
+	return r.getTLSConfig(ctx, secretRef, namespace, endpoint)
+}
+
 // getTLSConfig attempts to fetch a TLS configuration from the given
 // Secret reference, namespace and endpoint.
 func (r *BucketReconciler) getTLSConfig(ctx context.Context,
@@ -761,7 +793,7 @@ func (r *BucketReconciler) getTLSConfig(ctx context.Context,
 	if err != nil || certSecret == nil {
 		return nil, err
 	}
-	tlsConfig, _, err := tls.KubeTLSClientConfigFromSecret(*certSecret, endpoint)
+	tlsConfig, _, err := tlsutil.KubeTLSClientConfigFromSecret(*certSecret, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create TLS config: %w", err)
 	}
@@ -806,13 +838,13 @@ func (r *BucketReconciler) getSTSSecret(ctx context.Context, obj *sourcev1.Bucke
 	return r.getSecret(ctx, obj.Spec.STS.SecretRef, obj.GetNamespace())
 }
 
-// getSTSTLSConfig attempts to fetch the certificate secret from the object's
-// STS configuration.
+// getSTSTLSConfig attempts to fetch the certificate from the object's
+// STS configuration from either ConfigMap or Secret.
 func (r *BucketReconciler) getSTSTLSConfig(ctx context.Context, obj *sourcev1.Bucket) (*stdtls.Config, error) {
 	if obj.Spec.STS == nil {
 		return nil, nil
 	}
-	return r.getTLSConfig(ctx, obj.Spec.STS.CertSecretRef, obj.GetNamespace(), obj.Spec.STS.Endpoint)
+	return r.getTLSConfigFromRefs(ctx, obj.Spec.STS.CertConfigMapRef, obj.Spec.STS.CertSecretRef, obj.GetNamespace(), obj.Spec.STS.Endpoint)
 }
 
 // eventLogf records events, and logs at the same time.

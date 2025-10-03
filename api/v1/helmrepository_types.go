@@ -74,6 +74,13 @@ type HelmRepositorySpec struct {
 	// +optional
 	CertSecretRef *meta.LocalObjectReference `json:"certSecretRef,omitempty"`
 
+	// CertConfigMapRef specifies the ConfigMap containing the CA certificate
+	// to trust while connecting to the Helm repository over HTTPS.
+	// The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+	// This field takes precedence over any CA certificate specified in CertSecretRef or SecretRef.
+	// +optional
+	CertConfigMapRef *meta.LocalObjectReference `json:"certConfigMapRef,omitempty"`
+
 	// PassCredentials allows the credentials from the SecretRef to be passed
 	// on to a host that does not match the host as defined in URL.
 	// This may be required if the host of the advertised chart URLs in the

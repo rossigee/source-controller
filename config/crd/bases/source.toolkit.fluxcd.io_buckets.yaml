@@ -57,6 +57,20 @@ spec:
               bucketName:
                 description: BucketName is the name of the object storage bucket.
                 type: string
+              certConfigMapRef:
+                description: |-
+                  CertConfigMapRef specifies the ConfigMap containing the CA certificate
+                  to trust while connecting to the bucket over HTTPS.
+                  The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+                  This field takes precedence over any CA certificate specified in CertSecretRef.
+                  This field is only supported for the `generic` provider.
+                properties:
+                  name:
+                    description: Name of the referent.
+                    type: string
+                required:
+                - name
+                type: object
               certSecretRef:
                 description: |-
                   CertSecretRef can be given the name of a Secret containing
@@ -150,6 +164,20 @@ spec:
 
                   This field is only supported for the `aws` and `generic` providers.
                 properties:
+                  certConfigMapRef:
+                    description: |-
+                      CertConfigMapRef specifies the ConfigMap containing the CA certificate
+                      to trust while connecting to the STS endpoint over HTTPS.
+                      The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+                      This field takes precedence over any CA certificate specified in CertSecretRef.
+                      This field is only supported for the `ldap` provider.
+                    properties:
+                      name:
+                        description: Name of the referent.
+                        type: string
+                    required:
+                    - name
+                    type: object
                   certSecretRef:
                     description: |-
                       CertSecretRef can be given the name of a Secret containing

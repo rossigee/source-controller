@@ -36,6 +36,7 @@ import (
 	sourcev1 "github.com/fluxcd/source-controller/api/v1"
 	"github.com/fluxcd/source-controller/internal/helm/registry"
 	soci "github.com/fluxcd/source-controller/internal/oci"
+	tlsutil "github.com/fluxcd/source-controller/internal/tls"
 )
 
 const (
@@ -106,7 +107,7 @@ func GetClientOpts(ctx context.Context, c client.Client, obj *sourcev1.HelmRepos
 	return opts, tempCertDir, deprecatedErr
 }
 
-// configureAuthentication processes all secret references and sets up authentication.
+// configureAuthentication processes all secret and configmap references and sets up authentication.
 // Returns (deprecatedTLS, certSecret, authSecret, error) where:
 // - deprecatedTLS: true if TLS config comes from SecretRef (deprecated pattern)
 // - certSecret: the secret from CertSecretRef (nil if not specified)
@@ -115,7 +116,28 @@ func configureAuthentication(ctx context.Context, c client.Client, obj *sourcev1
 	var deprecatedTLS bool
 	var certSecret, authSecret *corev1.Secret
 
-	if obj.Spec.CertSecretRef != nil {
+	// Check for ConfigMap CA certificate first (takes precedence over CertSecretRef)
+	if obj.Spec.CertConfigMapRef != nil {
+		configMapName := types.NamespacedName{
+			Namespace: obj.GetNamespace(),
+			Name:      obj.Spec.CertConfigMapRef.Name,
+		}
+		var configMap corev1.ConfigMap
+		if err := c.Get(ctx, configMapName, &configMap); err != nil {
+			return false, nil, nil, fmt.Errorf("failed to get TLS authentication ConfigMap: %w", err)
+		}
+
+		caBytes, err := tlsutil.CAFromConfigMap(configMap)
+		if err != nil {
+			return false, nil, nil, fmt.Errorf("failed to extract CA certificate from ConfigMap: %w", err)
+		}
+
+		tlsConfig, err := tlsutil.TLSClientConfigWithCA(caBytes, url)
+		if err != nil {
+			return false, nil, nil, fmt.Errorf("failed to construct Helm client's TLS config from ConfigMap: %w", err)
+		}
+		opts.TlsConfig = tlsConfig
+	} else if obj.Spec.CertSecretRef != nil {
 		secret, err := fetchSecret(ctx, c, obj.Spec.CertSecretRef.Name, obj.GetNamespace())
 		if err != nil {
 			return false, nil, nil, fmt.Errorf("failed to get TLS authentication secret: %w", err)

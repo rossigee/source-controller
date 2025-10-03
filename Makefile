@@ -30,6 +30,7 @@ BUILD_DIR := $(REPOSITORY_ROOT)/build
 
 # Other dependency versions
 ENVTEST_BIN_VERSION ?= 1.24.0
+GOLANGCI_LINT_VERSION ?= v2.5.0
 
 # FUZZ_TIME defines the max amount of time, in Go Duration,
 # each fuzzer should run for.
@@ -120,8 +121,8 @@ api-docs: gen-crd-api-reference-docs  ## Generate API reference documentation
 	$(GEN_CRD_API_REFERENCE_DOCS) -api-dir=./api/v1 -config=./hack/api-docs/config.json -template-dir=./hack/api-docs/template -out-file=./docs/api/v1/source.md
 
 tidy:  ## Run go mod tidy
-	cd api; rm -f go.sum; go mod tidy -compat=1.24
-	rm -f go.sum; go mod tidy -compat=1.24
+	cd api; rm -f go.sum; go mod tidy -compat=1.25
+	rm -f go.sum; go mod tidy -compat=1.25
 
 fmt:  ## Run go fmt against code
 	go fmt ./...
@@ -130,6 +131,9 @@ fmt:  ## Run go fmt against code
 vet:  ## Run go vet against code
 	go vet ./...
 	cd api; go vet ./...
+
+lint: golangci-lint  ## Run golangci-lint
+	$(GOLANGCI_LINT) run
 
 generate: controller-gen  ## Generate API code
 	cd api; $(CONTROLLER_GEN) object:headerFile="../hack/boilerplate.go.txt" paths="./..."
@@ -160,6 +164,12 @@ ENVTEST = $(GOBIN)/setup-envtest
 setup-envtest: ## Download setup-envtest locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
 
+# Find or download golangci-lint
+GOLANGCI_LINT = $(GOBIN)/golangci-lint
+.PHONY: golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
+
 ENVTEST_ASSETS_DIR=$(BUILD_DIR)/testbin
 ENVTEST_KUBERNETES_VERSION?=latest
 install-envtest: setup-envtest ## Download envtest binaries locally.
@@ -175,7 +185,7 @@ help:  ## Display this help menu
 e2e:
 	./hack/ci/e2e.sh
 
-verify: fmt vet manifests api-docs tidy
+verify: fmt vet lint manifests api-docs tidy
 	@if [ ! "$$(git status --porcelain --untracked-files=no)" = "" ]; then \
 		echo "working directory is dirty:"; \
 		git --no-pager diff; \

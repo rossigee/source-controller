@@ -110,6 +110,14 @@ type BucketSpec struct {
 	// +optional
 	CertSecretRef *meta.LocalObjectReference `json:"certSecretRef,omitempty"`
 
+	// CertConfigMapRef specifies the ConfigMap containing the CA certificate
+	// to trust while connecting to the bucket over HTTPS.
+	// The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+	// This field takes precedence over any CA certificate specified in CertSecretRef.
+	// This field is only supported for the `generic` provider.
+	// +optional
+	CertConfigMapRef *meta.LocalObjectReference `json:"certConfigMapRef,omitempty"`
+
 	// ProxySecretRef specifies the Secret containing the proxy configuration
 	// to use while communicating with the Bucket server.
 	// +optional
@@ -179,6 +187,14 @@ type BucketSTSSpec struct {
 	// This field is only supported for the `ldap` provider.
 	// +optional
 	CertSecretRef *meta.LocalObjectReference `json:"certSecretRef,omitempty"`
+
+	// CertConfigMapRef specifies the ConfigMap containing the CA certificate
+	// to trust while connecting to the STS endpoint over HTTPS.
+	// The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+	// This field takes precedence over any CA certificate specified in CertSecretRef.
+	// This field is only supported for the `ldap` provider.
+	// +optional
+	CertConfigMapRef *meta.LocalObjectReference `json:"certConfigMapRef,omitempty"`
 }
 
 // BucketStatus records the observed state of a Bucket.

@@ -1,5 +1,7 @@
 # Source controller
 
+> **⚠️ FORK DISCLAIMER**: The `develop` branch of this repository contains custom enhancements and architectural changes that differ from the upstream Flux source-controller. These modifications add functionality beyond the standard Flux toolkit. For the original upstream behavior, use the `main` branch which tracks the official Flux source-controller repository.
+
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/4786/badge)](https://bestpractices.coreinfrastructure.org/projects/4786)
 [![e2e](https://github.com/fluxcd/source-controller/workflows/e2e/badge.svg)](https://github.com/fluxcd/source-controller/actions)
 [![report](https://goreportcard.com/badge/github.com/fluxcd/source-controller)](https://goreportcard.com/report/github.com/fluxcd/source-controller)
@@ -11,6 +13,15 @@ from external sources such as Git, OCI, Helm repositories and S3-compatible buck
 The source-controller implements the
 [source.toolkit.fluxcd.io](docs/spec/README.md) API
 and is a core component of the [GitOps toolkit](https://fluxcd.io/flux/components/).
+
+## Custom Features (develop branch only)
+
+This fork includes the following architectural enhancements beyond upstream:
+
+- **Enhanced Artifact Serving**: Improved handling of URL prefixes in `--storage-adv-addr` configuration
+- **Bug Fixes**: Resolution of double HTTP prefix issues in artifact URL generation
+- **Code Quality**: Updated to Go 1.25.1 with modern linting standards (golangci-lint v2.5.0)
+- **Improved Testing**: Enhanced test coverage and mock implementations
 
 ## Known Issues
 

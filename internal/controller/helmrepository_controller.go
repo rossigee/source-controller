@@ -109,7 +109,7 @@ type HelmRepositoryReconciler struct {
 	helper.Metrics
 
 	Getters        helmgetter.Providers
-	Storage        *Storage
+	Storage        StorageInterface
 	ControllerName string
 
 	Cache *cache.Cache

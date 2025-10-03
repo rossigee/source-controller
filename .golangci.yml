@@ -1,0 +1,75 @@
+version: 2
+run:
+  timeout: 10m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - asciicheck
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - dupl
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - misspell
+    - goconst
+    - gocyclo
+    - revive
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+
+  gocyclo:
+    min-complexity: 15
+
+  misspell:
+    locale: US
+
+  revive:
+    min-confidence: 0
+    rules:
+      - name: atomic
+      - name: line-length-limit
+        arguments: [120]
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - goconst
+        - dupl
+
+    # Exclude some linters from running on generated files.
+    - path: zz_generated\.deepcopy\.go
+      linters:
+        - all
+
+    # Exclude specific rules
+    - linters:
+        - staticcheck
+      text: "SA1019:"  # Using deprecated functions/methods
+
+    - linters:
+        - govet
+      text: "shadow:"  # Variable shadowing

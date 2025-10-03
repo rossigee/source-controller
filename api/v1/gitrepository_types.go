@@ -92,6 +92,13 @@ type GitRepositorySpec struct {
 	// +optional
 	SecretRef *meta.LocalObjectReference `json:"secretRef,omitempty"`
 
+	// CertConfigMapRef specifies the ConfigMap containing the CA certificate
+	// to trust while connecting to the Git repository over HTTPS.
+	// The ConfigMap must contain a 'ca.crt' key with a PEM-encoded CA certificate.
+	// This field takes precedence over any CA certificate specified in SecretRef.
+	// +optional
+	CertConfigMapRef *meta.LocalObjectReference `json:"certConfigMapRef,omitempty"`
+
 	// Provider used for authentication, can be 'azure', 'github', 'generic'.
 	// When not specified, defaults to 'generic'.
 	// +kubebuilder:validation:Enum=generic;azure;github

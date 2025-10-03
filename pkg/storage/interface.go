@@ -59,6 +59,10 @@ type Interface interface {
 
 	// Healthy checks if the storage backend is available.
 	Healthy(ctx context.Context) error
+
+	// ResolvePseudoSymlink resolves a JSON pseudo-symlink and returns the target URL.
+	// Returns an error if the path is not a pseudo-symlink or if resolution fails.
+	ResolvePseudoSymlink(ctx context.Context, linkPath string) (string, error)
 }
 
 // ArtifactFilter defines criteria for filtering artifacts.

@@ -1,0 +1,66 @@
+# Example: Using ConfigMap for CA certificates in source-controller
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-ca-cert
+  namespace: flux-system
+data:
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDXTCCAkWgAwIBAgIJAKL3eXyDz...
+    ... (your CA certificate here) ...
+    -----END CERTIFICATE-----
+---
+# GitRepository with ConfigMap CA certificate
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: my-repo
+  namespace: flux-system
+spec:
+  url: https://git.example.com/my-org/my-repo
+  interval: 5m
+  ref:
+    branch: main
+  certConfigMapRef:
+    name: my-ca-cert
+---
+# HelmRepository with ConfigMap CA certificate
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: my-helm-repo
+  namespace: flux-system
+spec:
+  url: https://charts.example.com
+  interval: 10m
+  certConfigMapRef:
+    name: my-ca-cert
+---
+# OCIRepository with ConfigMap CA certificate
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: my-oci-repo
+  namespace: flux-system
+spec:
+  url: oci://registry.example.com/my-org/my-app
+  interval: 5m
+  ref:
+    tag: latest
+  certConfigMapRef:
+    name: my-ca-cert
+---
+# Bucket with ConfigMap CA certificate
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: Bucket
+metadata:
+  name: my-bucket
+  namespace: flux-system
+spec:
+  endpoint: https://s3.example.com
+  bucketName: my-artifacts
+  interval: 10m
+  provider: generic
+  certConfigMapRef:
+    name: my-ca-cert
