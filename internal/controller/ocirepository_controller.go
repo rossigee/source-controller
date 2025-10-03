@@ -78,7 +78,7 @@ import (
 	"github.com/fluxcd/source-controller/internal/oci/notation"
 	sreconcile "github.com/fluxcd/source-controller/internal/reconcile"
 	"github.com/fluxcd/source-controller/internal/reconcile/summarize"
-	"github.com/fluxcd/source-controller/internal/tls"
+	tlsutil "github.com/fluxcd/source-controller/internal/tls"
 	"github.com/fluxcd/source-controller/internal/util"
 )
 
@@ -141,12 +141,12 @@ type OCIRepositoryReconciler struct {
 	helper.Metrics
 	kuberecorder.EventRecorder
 
-	Storage           *Storage
+	Storage           StorageInterface
 	ControllerName    string
 	TokenCache        *cache.TokenCache
 	requeueDependency time.Duration
 
-	patchOptions []patch.Option
+	patchOptions   []patch.Option
 	failureTracker sync.Map // Track failure counts for exponential backoff per resource
 }
 
@@ -560,15 +560,15 @@ func (r *OCIRepositoryReconciler) reconcileSource(ctx context.Context, sp *patch
 	case sourcev1.OCILayerExtract:
 		if err = tar.Untar(blob, dir, tar.WithMaxUntarSize(-1), tar.WithSkipSymlinks()); err != nil {
 			// Check if this is a gzip corruption error
-			if strings.Contains(err.Error(), "gzip: invalid header") || 
-			   strings.Contains(err.Error(), "requires gzip-compressed body") {
+			if strings.Contains(err.Error(), "gzip: invalid header") ||
+				strings.Contains(err.Error(), "requires gzip-compressed body") {
 				// This is likely a corrupted artifact, use longer backoff
 				e := serror.NewWaiting(
 					fmt.Errorf("artifact appears to be corrupted (gzip error): %w", err),
 					sourcev1.OCILayerOperationFailedReason,
 				)
 				e.RequeueAfter = 5 * time.Minute
-				conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason, 
+				conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason,
 					"Artifact gzip corruption detected: %s. Will retry in 5 minutes.", err)
 				return sreconcile.ResultEmpty, e
 			}
@@ -615,7 +615,8 @@ func (r *OCIRepositoryReconciler) reconcileSource(ctx context.Context, sp *patch
 }
 
 // selectLayer finds the matching layer and returns its compressed contents.
-// If no layer selector was provided, we pick the first layer from the OCI artifact.
+// If no layer selector was provided, we pick the first layer from the OCI artifact,
+// or the Helm chart content layer if this appears to be a Helm chart.
 func (r *OCIRepositoryReconciler) selectLayer(obj *sourcev1.OCIRepository, image gcrv1.Image) (io.ReadCloser, error) {
 	layers, err := image.Layers()
 	if err != nil {
@@ -645,15 +646,34 @@ func (r *OCIRepositoryReconciler) selectLayer(obj *sourcev1.OCIRepository, image
 			return nil, fmt.Errorf("failed to find layer with media type '%s' in artifact", obj.GetLayerMediaType())
 		}
 	default:
-		layer = layers[0]
+		// Check if this appears to be a Helm chart and select the chart content layer
+		if helmLayer := r.findHelmChartLayer(layers); helmLayer != nil {
+			layer = helmLayer
+		} else {
+			layer = layers[0]
+		}
 	}
 
 	blob, err := layer.Compressed()
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract the first layer from artifact: %w", err)
+		return nil, fmt.Errorf("failed to extract the layer from artifact: %w", err)
 	}
 
 	return blob, nil
+}
+
+// findHelmChartLayer looks for a layer with the Helm chart content media type.
+// Returns the layer if found, nil otherwise.
+func (r *OCIRepositoryReconciler) findHelmChartLayer(layers []gcrv1.Layer) gcrv1.Layer {
+	// Helm chart content layer media type
+	helmChartContentType := "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
+
+	for _, layer := range layers {
+		if md, err := layer.MediaType(); err == nil && string(md) == helmChartContentType {
+			return layer
+		}
+	}
+	return nil
 }
 
 // getRevision fetches the upstream digest, returning the revision in the
@@ -1019,8 +1039,33 @@ func (r *OCIRepositoryReconciler) transport(ctx context.Context, obj *sourcev1.O
 }
 
 // getTLSConfig gets the TLS configuration for the transport based on the
-// specified secret reference in the OCIRepository object, or the insecure flag.
+// specified secret or configmap reference in the OCIRepository object, or the insecure flag.
 func (r *OCIRepositoryReconciler) getTLSConfig(ctx context.Context, obj *sourcev1.OCIRepository) (*cryptotls.Config, error) {
+	// Check for ConfigMap CA certificate first (takes precedence)
+	if obj.Spec.CertConfigMapRef != nil && obj.Spec.CertConfigMapRef.Name != "" {
+		configMapName := types.NamespacedName{
+			Namespace: obj.Namespace,
+			Name:      obj.Spec.CertConfigMapRef.Name,
+		}
+		var configMap corev1.ConfigMap
+		if err := r.Get(ctx, configMapName, &configMap); err != nil {
+			return nil, err
+		}
+
+		caBytes, err := tlsutil.CAFromConfigMap(configMap)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConfig, err := tlsutil.TLSClientConfigWithCA(caBytes, "")
+		if err != nil {
+			return nil, err
+		}
+
+		return tlsConfig, nil
+	}
+
+	// Fall back to Secret-based configuration
 	if obj.Spec.CertSecretRef == nil || obj.Spec.CertSecretRef.Name == "" {
 		if obj.Spec.Insecure {
 			return &cryptotls.Config{
@@ -1039,12 +1084,12 @@ func (r *OCIRepositoryReconciler) getTLSConfig(ctx context.Context, obj *sourcev
 		return nil, err
 	}
 
-	tlsConfig, _, err := tls.KubeTLSClientConfigFromSecret(certSecret, "")
+	tlsConfig, _, err := tlsutil.KubeTLSClientConfigFromSecret(certSecret, "")
 	if err != nil {
 		return nil, err
 	}
 	if tlsConfig == nil {
-		tlsConfig, _, err = tls.TLSClientConfigFromSecret(certSecret, "")
+		tlsConfig, _, err = tlsutil.TLSClientConfigFromSecret(certSecret, "")
 		if err != nil {
 			return nil, err
 		}

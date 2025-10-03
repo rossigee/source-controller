@@ -506,7 +506,8 @@ This field takes precedence over all other fields.
 ### Layer selector
 
 `spec.layerSelector` is an optional field to specify which layer should be extracted from the OCI Artifact.
-If not specified, the controller will extract the first layer found in the artifact.
+If not specified, the controller will attempt to extract a layer with the Helm chart content media type
+(`application/vnd.cncf.helm.chart.content.v1.tar+gzip`). If no such layer is found, it will extract the first layer found in the artifact.
 
 To extract a layer matching a specific
 [OCI media type](https://github.com/opencontainers/image-spec/blob/v1.0.2/media-types.md):

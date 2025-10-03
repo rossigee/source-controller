@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -36,6 +37,7 @@ import (
 	gcrv1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/notaryproject/notation-core-go/signature/cose"
 	"github.com/notaryproject/notation-core-go/testhelper"
 	"github.com/notaryproject/notation-go"
@@ -3889,4 +3891,80 @@ func TestOCIRepositoryReconciler_getProxyURL(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOCIRepositoryReconciler_findHelmChartLayer(t *testing.T) {
+	tests := []struct {
+		name     string
+		layers   []gcrv1.Layer
+		expected bool // true if a Helm chart layer should be found
+	}{
+		{
+			name: "Helm chart layer present",
+			layers: []gcrv1.Layer{
+				&mockLayer{mediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip"},
+				&mockLayer{mediaType: "application/vnd.cncf.helm.chart.content.v1.tar+gzip"},
+			},
+			expected: true,
+		},
+		{
+			name: "No Helm chart layer",
+			layers: []gcrv1.Layer{
+				&mockLayer{mediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip"},
+				&mockLayer{mediaType: "application/vnd.docker.image.rootfs.diff.tar.gzip"},
+			},
+			expected: false,
+		},
+		{
+			name:     "Empty layers",
+			layers:   []gcrv1.Layer{},
+			expected: false,
+		},
+	}
+
+	r := &OCIRepositoryReconciler{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := r.findHelmChartLayer(tt.layers)
+			if tt.expected {
+				if result == nil {
+					t.Errorf("expected to find Helm chart layer, but got nil")
+				}
+			} else {
+				if result != nil {
+					t.Errorf("expected no Helm chart layer, but got %v", result)
+				}
+			}
+		})
+	}
+}
+
+// mockLayer implements gcrv1.Layer for testing
+type mockLayer struct {
+	mediaType types.MediaType
+}
+
+func (m *mockLayer) Digest() (gcrv1.Hash, error) {
+	return gcrv1.Hash{}, nil
+}
+
+func (m *mockLayer) DiffID() (gcrv1.Hash, error) {
+	return gcrv1.Hash{}, nil
+}
+
+func (m *mockLayer) Compressed() (io.ReadCloser, error) {
+	return nil, nil
+}
+
+func (m *mockLayer) Uncompressed() (io.ReadCloser, error) {
+	return nil, nil
+}
+
+func (m *mockLayer) Size() (int64, error) {
+	return 0, nil
+}
+
+func (m *mockLayer) MediaType() (types.MediaType, error) {
+	return m.mediaType, nil
 }

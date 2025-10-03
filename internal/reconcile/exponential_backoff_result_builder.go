@@ -20,7 +20,7 @@ import (
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
-	
+
 	serror "github.com/fluxcd/source-controller/internal/error"
 )
 
@@ -89,7 +89,7 @@ func (r *ExponentialBackoffResultBuilder) calculateBackoff() time.Duration {
 
 	// Calculate exponential backoff: min * 2^failures
 	backoff := r.MinBackoff * time.Duration(1<<uint(r.FailureCount))
-	
+
 	// Cap at maximum backoff
 	if backoff > r.MaxBackoff {
 		backoff = r.MaxBackoff
