@@ -73,7 +73,7 @@ committer Sanskar Jaiswal <jaiswalsanskar078@gmail.com> 1691068951 +0530
 
 git/e2e: disable CGO while running e2e tests
 
-Disable CGO for Git e2e tests as it was originially required because of
+Disable CGO for Git e2e tests as it was originally required because of
 our libgit2 client. Since we no longer maintain a libgit2 client, there
 is no need to run the tests with CGO enabled.
 
@@ -209,7 +209,7 @@ func TestGitRepositoryReconciler_Reconcile(t *testing.T) {
 
 	server, err := gittestserver.NewTempGitServer()
 	g.Expect(err).NotTo(HaveOccurred())
-	defer os.RemoveAll(server.Root())
+	defer func() { _ = os.RemoveAll(server.Root()) }()
 	server.AutoCreate()
 	g.Expect(server.StartHTTP()).To(Succeed())
 	defer server.StopHTTP()
@@ -286,7 +286,7 @@ func TestGitRepositoryReconciler_reconcileSource_emptyRepository(t *testing.T) {
 
 	server, err := gittestserver.NewTempGitServer()
 	g.Expect(err).NotTo(HaveOccurred())
-	defer os.RemoveAll(server.Root())
+	defer func() { _ = os.RemoveAll(server.Root()) }()
 	server.AutoCreate()
 	g.Expect(server.StartHTTP()).To(Succeed())
 	defer server.StopHTTP()
@@ -692,7 +692,7 @@ func TestGitRepositoryReconciler_reconcileSource_authStrategy(t *testing.T) {
 
 			server, err := gittestserver.NewTempGitServer()
 			g.Expect(err).NotTo(HaveOccurred())
-			defer os.RemoveAll(server.Root())
+			defer func() { _ = os.RemoveAll(server.Root()) }()
 			server.AutoCreate()
 
 			repoPath := "/test.git"
@@ -719,9 +719,9 @@ func TestGitRepositoryReconciler_reconcileSource_authStrategy(t *testing.T) {
 				obj.Spec.URL = server.SSHAddress() + repoPath
 
 				go func() {
-					server.StartSSH()
+					_ = server.StartSSH()
 				}()
-				defer server.StopSSH()
+				defer func() { _ = server.StopSSH() }()
 
 				if secret != nil && len(secret.Data["known_hosts"]) == 0 {
 					u, err := url.Parse(obj.Spec.URL)
@@ -1078,7 +1078,7 @@ func TestGitRepositoryReconciler_reconcileSource_checkoutStrategy(t *testing.T) 
 
 	server, err := gittestserver.NewTempGitServer()
 	g.Expect(err).To(BeNil())
-	defer os.RemoveAll(server.Root())
+	defer func() { _ = os.RemoveAll(server.Root()) }()
 	server.AutoCreate()
 	g.Expect(server.StartHTTP()).To(Succeed())
 	defer server.StopHTTP()
@@ -1299,7 +1299,7 @@ func TestGitRepositoryReconciler_reconcileArtifact(t *testing.T) {
 		res, err := http.Get(artifactURL)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(res.StatusCode).To(Equal(http.StatusOK))
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		return &res.ContentLength
 	}
 
@@ -1307,7 +1307,7 @@ func TestGitRepositoryReconciler_reconcileArtifact(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			resetChmod(tt.dir, 0o750, 0o600)
+			_ = resetChmod(tt.dir, 0o750, 0o600)
 
 			r := &GitRepositoryReconciler{
 				EventRecorder: record.NewFakeRecorder(32),
@@ -1357,7 +1357,7 @@ func TestGitRepositoryReconciler_reconcileInclude(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	storage, err := newTestStorage(server.HTTPServer)
 	g.Expect(err).NotTo(HaveOccurred())
-	defer os.RemoveAll(storage.BasePath)
+	defer func() { _ = os.RemoveAll(storage.BasePath) }()
 
 	dependencyInterval := 5 * time.Second
 
@@ -2313,7 +2313,7 @@ func TestGitRepositoryReconciler_ConditionsUpdate(t *testing.T) {
 
 	server, err := gittestserver.NewTempGitServer()
 	g.Expect(err).NotTo(HaveOccurred())
-	defer os.RemoveAll(server.Root())
+	defer func() { _ = os.RemoveAll(server.Root()) }()
 	server.AutoCreate()
 	g.Expect(server.StartHTTP()).To(Succeed())
 	defer server.StopHTTP()
@@ -2525,7 +2525,7 @@ func commitFromFixture(repo *gogit.Repository, fixture string) error {
 		if err != nil {
 			return err
 		}
-		defer ff.Close()
+		defer func() { _ = ff.Close() }()
 
 		_, err = ff.Write(fileBytes)
 		return err
@@ -3000,14 +3000,14 @@ func resetChmod(path string, dirMode os.FileMode, fileMode os.FileMode) error {
 			}
 
 			if info.IsDir() && info.Mode() != dirMode {
-				os.Chmod(path, dirMode)
+				_ = os.Chmod(path, dirMode)
 			} else if !info.IsDir() && info.Mode() != fileMode {
-				os.Chmod(path, fileMode)
+				_ = os.Chmod(path, fileMode)
 			}
 			return nil
 		})
 	if err != nil {
-		return fmt.Errorf("cannot reset file permissions: %v", err)
+		return fmt.Errorf("cannot reset file permissions: %w", err)
 	}
 
 	return nil

@@ -131,7 +131,7 @@ func TestComputeReconcileResult(t *testing.T) {
 		{
 			name:       "stalling error",
 			result:     ResultEmpty,
-			recErr:     &serror.Stalling{Err: fmt.Errorf("some error"), Reason: "some reason"},
+			recErr:     &serror.StallingError{Err: fmt.Errorf("some error"), Reason: "some reason"},
 			wantResult: ctrl.Result{},
 			wantErr:    false,
 			assertConditions: []metav1.Condition{
@@ -144,7 +144,7 @@ func TestComputeReconcileResult(t *testing.T) {
 		{
 			name:       "waiting error",
 			result:     ResultEmpty,
-			recErr:     &serror.Waiting{Err: fmt.Errorf("some error"), Reason: "some reason"},
+			recErr:     &serror.WaitingError{Err: fmt.Errorf("some error"), Reason: "some reason"},
 			wantResult: ctrl.Result{RequeueAfter: testSuccessInterval},
 			wantErr:    false,
 			afterFunc: func(t *WithT, obj conditions.Setter, patchOpts *patch.HelperOptions) {
@@ -157,7 +157,7 @@ func TestComputeReconcileResult(t *testing.T) {
 			beforeFunc: func(obj conditions.Setter) {
 				conditions.MarkStalled(obj, "SomeReason", "some message")
 			},
-			recErr: &serror.Generic{
+			recErr: &serror.GenericError{
 				Err: fmt.Errorf("some error"), Reason: "some reason",
 			},
 			wantResult: ctrl.Result{},
@@ -172,7 +172,7 @@ func TestComputeReconcileResult(t *testing.T) {
 			beforeFunc: func(obj conditions.Setter) {
 				conditions.MarkReconciling(obj, "NewRevision", "new revision")
 			},
-			recErr: &serror.Generic{
+			recErr: &serror.GenericError{
 				Err: fmt.Errorf("some error"), Reason: "some reason",
 				Config: serror.Config{
 					Ignore: true,

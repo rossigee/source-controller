@@ -76,6 +76,15 @@ import (
 // -> s > 100
 const maxConcurrentBucketFetches = 100
 
+// buildingArtifactMsg is the default message used when building an artifact
+const buildingArtifactMsg = "building artifact"
+
+// artifactDisappearedMsg is the message suffix used when an artifact disappears from storage
+const artifactDisappearedMsg = ": disappeared from storage"
+
+// buildingArtifactDisappearedMsg is the full message used when building an artifact that disappeared
+const buildingArtifactDisappearedMsg = buildingArtifactMsg + artifactDisappearedMsg
+
 // bucketReadyCondition contains the information required to summarize a
 // v1.Bucket Ready Condition.
 var bucketReadyCondition = summarize.Conditions{
@@ -395,9 +404,9 @@ func (r *BucketReconciler) reconcileStorage(ctx context.Context, sp *patch.Seria
 
 	// Record that we do not have an artifact
 	if obj.GetArtifact() == nil {
-		msg := "building artifact"
+		msg := buildingArtifactMsg
 		if artifactMissing {
-			msg += ": disappeared from storage"
+			msg = buildingArtifactDisappearedMsg
 		}
 		rreconcile.ProgressiveStatus(true, obj, meta.ProgressingReason, "%s", msg)
 		conditions.Delete(obj, sourcev1.ArtifactInStorageCondition)
@@ -659,7 +668,7 @@ func (r *BucketReconciler) reconcileArtifact(ctx context.Context, sp *patch.Seri
 	// Archive directory to storage
 	if err := r.Storage.Archive(&artifact, dir, nil); err != nil {
 		e := serror.NewGeneric(
-			fmt.Errorf("unable to archive artifact to storage: %s", err),
+			fmt.Errorf("unable to archive artifact to storage: %w", err),
 			sourcev1.ArchiveOperationFailedReason,
 		)
 		conditions.MarkTrue(obj, sourcev1.StorageOperationFailedCondition, e.Reason, "%s", e)
@@ -709,7 +718,7 @@ func (r *BucketReconciler) garbageCollect(ctx context.Context, obj *sourcev1.Buc
 	if !obj.DeletionTimestamp.IsZero() {
 		if deleted, err := r.Storage.RemoveAll(r.Storage.NewArtifactFor(obj.Kind, obj.GetObjectMeta(), "", "*")); err != nil {
 			return serror.NewGeneric(
-				fmt.Errorf("garbage collection for deleted resource failed: %s", err),
+				fmt.Errorf("garbage collection for deleted resource failed: %w", err),
 				"GarbageCollectionFailed",
 			)
 		} else if deleted != "" {

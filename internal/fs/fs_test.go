@@ -30,7 +30,7 @@ func TestRenameWithFallback(t *testing.T) {
 	if srcf, err := os.Create(srcpath); err != nil {
 		t.Fatal(err)
 	} else {
-		srcf.Close()
+		_ = srcf.Close()
 	}
 
 	if err := RenameWithFallback(srcpath, filepath.Join(dir, "dst")); err != nil {
@@ -85,7 +85,7 @@ func TestCopyDir(t *testing.T) {
 		if _, err = fh.Write([]byte(file.contents)); err != nil {
 			t.Fatal(err)
 		}
-		fh.Close()
+		_ = fh.Close()
 
 		files[i].fi, err = os.Stat(fn)
 		if err != nil {
@@ -134,7 +134,7 @@ func TestCopyDir(t *testing.T) {
 func TestCopyDirFail_SrcInaccessible(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
-		// Microsoft Windows. Skipping this this until a
+		// Microsoft Windows. Skipping this until a
 		// compatible implementation is provided.
 		t.Skip("skipping on windows")
 	}
@@ -157,7 +157,7 @@ func TestCopyDirFail_SrcInaccessible(t *testing.T) {
 func TestCopyDirFail_DstInaccessible(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
-		// Microsoft Windows. Skipping this this until a
+		// Microsoft Windows. Skipping this until a
 		// compatible implementation is provided.
 		t.Skip("skipping on windows")
 	}
@@ -235,7 +235,7 @@ func TestCopyDirFailOpen(t *testing.T) {
 		// Microsoft Windows. os.Chmod(..., 0o222) below is not
 		// enough for the file to be readonly, and os.Chmod(...,
 		// 0000) returns an invalid argument error. Skipping
-		// this this until a compatible implementation is
+		// this until a compatible implementation is
 		// provided.
 		t.Skip("skipping on windows")
 	}
@@ -254,7 +254,7 @@ func TestCopyDirFailOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srcf.Close()
+	_ = srcf.Close()
 
 	// setup source file so that it cannot be read
 	if err = os.Chmod(srcfn, 0o220); err != nil {
@@ -280,7 +280,7 @@ func TestCopyFile(t *testing.T) {
 	if _, err := srcf.Write([]byte(want)); err != nil {
 		t.Fatal(err)
 	}
-	srcf.Close()
+	_ = srcf.Close()
 
 	destf := filepath.Join(dir, "destf")
 	if err := copyFile(srcf.Name(), destf); err != nil {
@@ -400,7 +400,7 @@ func TestCopyFileLongFilePath(t *testing.T) {
 func TestCopyFileFail(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// XXX: setting permissions works differently in
-		// Microsoft Windows. Skipping this this until a
+		// Microsoft Windows. Skipping this until a
 		// compatible implementation is provided.
 		t.Skip("skipping on windows")
 	}
@@ -411,7 +411,7 @@ func TestCopyFileFail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srcf.Close()
+	_ = srcf.Close()
 
 	var dstdir string
 
@@ -427,7 +427,7 @@ func TestCopyFileFail(t *testing.T) {
 }
 
 // setupInaccessibleDir creates a temporary location with a single
-// directory in it, in such a way that that directory is not accessible
+// directory in it, in such a way that the directory is not accessible
 // after this function returns.
 //
 // op is called with the directory as argument, so that it can create

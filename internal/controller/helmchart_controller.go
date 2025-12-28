@@ -555,7 +555,7 @@ func (r *HelmChartReconciler) buildFromHelmRepository(ctx context.Context, obj *
 		// with this function call, we create a temporary file to store the credentials if needed.
 		// this is needed because otherwise the credentials are stored in ~/.docker/config.json.
 		// TODO@souleb: remove this once the registry move to Oras v2
-		// or rework to enable reusing credentials to avoid the unneccessary handshake operations
+		// or rework to enable reusing credentials to avoid the unnecessary handshake operations
 		registryClient, credentialsFile, err := r.RegistryClientGenerator(clientOpts.TlsConfig, clientOpts.MustLoginToRegistry(), repo.Spec.Insecure)
 		if err != nil {
 			e := serror.NewGeneric(
@@ -707,7 +707,7 @@ func (r *HelmChartReconciler) buildFromTarballArtifact(ctx context.Context, obj 
 		conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, e.Reason, "%s", e)
 		return sreconcile.ResultEmpty, e
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create directory to untar source into
 	sourceDir := filepath.Join(tmpDir, "source")
@@ -849,7 +849,7 @@ func (r *HelmChartReconciler) reconcileArtifact(ctx context.Context, _ *patch.Se
 	}
 
 	// Garbage collect chart build once persisted to storage
-	defer os.Remove(b.Path)
+	defer func() { _ = os.Remove(b.Path) }()
 
 	// Ensure artifact directory exists and acquire lock
 	if err := r.Storage.MkdirAll(artifact); err != nil {
@@ -1083,7 +1083,7 @@ func (r *HelmChartReconciler) namespacedChartRepositoryCallback(ctx context.Cont
 						if err := httpChartRepo.LoadFromPath(); err != nil {
 							return nil, err
 						}
-						r.Cache.Set(artifact.Path, httpChartRepo.Index, r.TTL)
+						_ = r.Cache.Set(artifact.Path, httpChartRepo.Index, r.TTL)
 					}
 				}
 			}
@@ -1237,7 +1237,7 @@ func (r *HelmChartReconciler) eventLogf(ctx context.Context, obj runtime.Object,
 	r.Eventf(obj, eventType, reason, msg)
 }
 
-// observeChartBuild records the observation on the given given build and error on the object.
+// observeChartBuild records the observation on the given build and error on the object.
 func observeChartBuild(ctx context.Context, sp *patch.SerialPatcher, pOpts []patch.Option, obj *sourcev1.HelmChart, build *chart.Build, err error) {
 	if build.HasMetadata() {
 		if build.Name != obj.Status.ObservedChartName || !obj.GetArtifact().HasRevision(build.Version) {

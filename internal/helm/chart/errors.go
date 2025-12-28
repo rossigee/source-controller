@@ -21,8 +21,8 @@ import (
 	"fmt"
 )
 
-// BuildErrorReason is the descriptive reason for a BuildError.
-type BuildErrorReason struct {
+// BuildReasonError is the descriptive reason for a BuildError.
+type BuildReasonError struct {
 	// Reason is the programmatic build error reason in CamelCase.
 	Reason string
 
@@ -31,14 +31,14 @@ type BuildErrorReason struct {
 	Summary string
 }
 
-// Error returns the string representation of BuildErrorReason.
-func (e BuildErrorReason) Error() string {
+// Error returns the string representation of BuildReasonError.
+func (e BuildReasonError) Error() string {
 	return e.Summary
 }
 
 // BuildError contains a wrapped Err and a Reason indicating why it occurred.
 type BuildError struct {
-	Reason BuildErrorReason
+	Reason BuildReasonError
 	Err    error
 }
 
@@ -57,7 +57,7 @@ func (e *BuildError) Error() string {
 //	err := &BuildError{Reason: ErrChartPull, Err: errors.New("arbitrary transport error")}
 //	errors.Is(err, ErrChartPull)
 func (e *BuildError) Is(target error) bool {
-	if e.Reason == target {
+	if target == e.Reason {
 		return true
 	}
 	return errors.Is(e.Err, target)
@@ -78,12 +78,12 @@ func IsPersistentBuildErrorReason(err error) bool {
 }
 
 var (
-	ErrChartReference     = BuildErrorReason{Reason: "InvalidChartReference", Summary: "invalid chart reference"}
-	ErrChartPull          = BuildErrorReason{Reason: "ChartPullError", Summary: "chart pull error"}
-	ErrChartMetadataPatch = BuildErrorReason{Reason: "MetadataPatchError", Summary: "chart metadata patch error"}
-	ErrValuesFilesMerge   = BuildErrorReason{Reason: "ValuesFilesError", Summary: "values files merge error"}
-	ErrDependencyBuild    = BuildErrorReason{Reason: "DependencyBuildError", Summary: "dependency build error"}
-	ErrChartPackage       = BuildErrorReason{Reason: "ChartPackageError", Summary: "chart package error"}
-	ErrChartVerification  = BuildErrorReason{Reason: "ChartVerificationError", Summary: "chart verification error"}
-	ErrUnknown            = BuildErrorReason{Reason: "Unknown", Summary: "unknown build error"}
+	ErrChartReference     = BuildReasonError{Reason: "InvalidChartReference", Summary: "invalid chart reference"}
+	ErrChartPull          = BuildReasonError{Reason: "ChartPullError", Summary: "chart pull error"}
+	ErrChartMetadataPatch = BuildReasonError{Reason: "MetadataPatchError", Summary: "chart metadata patch error"}
+	ErrValuesFilesMerge   = BuildReasonError{Reason: "ValuesFilesError", Summary: "values files merge error"}
+	ErrDependencyBuild    = BuildReasonError{Reason: "DependencyBuildError", Summary: "dependency build error"}
+	ErrChartPackage       = BuildReasonError{Reason: "ChartPackageError", Summary: "chart package error"}
+	ErrChartVerification  = BuildReasonError{Reason: "ChartVerificationError", Summary: "chart verification error"}
+	ErrUnknown            = BuildReasonError{Reason: "Unknown", Summary: "unknown build error"}
 )

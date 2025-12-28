@@ -171,7 +171,7 @@ func NewOCIChartRepository(repositoryURL string, chartRepoOpts ...OCIChartReposi
 func (r *OCIChartRepository) GetChartVersion(name, ver string) (*repo.ChartVersion, error) {
 	cv, err := r.getChartVersion(name, ver)
 	if err != nil {
-		return nil, &ErrExternal{Err: err}
+		return nil, &ExternalError{Err: err}
 	}
 	return cv, nil
 }
@@ -197,7 +197,7 @@ func (r *OCIChartRepository) getChartVersion(name, ver string) (*repo.ChartVersi
 
 	cvs, err := r.getTags(cpURL.String())
 	if err != nil {
-		return nil, fmt.Errorf("could not get tags for %q: %s", name, err)
+		return nil, fmt.Errorf("could not get tags for %q: %w", name, err)
 	}
 
 	if len(cvs) == 0 {
@@ -224,7 +224,7 @@ func (r *OCIChartRepository) getTags(ref string) ([]string, error) {
 	// Retrieve list of repository tags
 	tags, err := r.RegistryClient.Tags(strings.TrimPrefix(ref, fmt.Sprintf("%s://", registry.OCIScheme)))
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch tags for %q: %s", ref, err)
+		return nil, fmt.Errorf("could not fetch tags for %q: %w", ref, err)
 	}
 	if len(tags) == 0 {
 		return nil, fmt.Errorf("unable to locate any tags in provided repository: %s", ref)
@@ -376,7 +376,7 @@ func (r *OCIChartRepository) VerifyChart(ctx context.Context, chart *repo.ChartV
 
 	ref, err := name.ParseReference(strings.TrimPrefix(chart.URLs[0], fmt.Sprintf("%s://", registry.OCIScheme)), nameOpts...)
 	if err != nil {
-		return oci.VerificationResultFailed, fmt.Errorf("invalid chart reference: %s", err)
+		return oci.VerificationResultFailed, fmt.Errorf("invalid chart reference: %w", err)
 	}
 
 	verificationResult := oci.VerificationResultFailed

@@ -149,7 +149,7 @@ func setupRegistryServer(ctx context.Context, workspaceDir string, opts registry
 	config := &configuration.Configuration{}
 	port, err := freeport.GetFreePort()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get free port: %s", err)
+		return nil, fmt.Errorf("failed to get free port: %w", err)
 	}
 
 	// Change the registry host to a host which is not localhost and
@@ -182,12 +182,12 @@ func setupRegistryServer(ctx context.Context, workspaceDir string, opts registry
 		// create htpasswd file (w BCrypt, which is required)
 		pwBytes, err := bcrypt.GenerateFromPassword([]byte(testRegistryPassword), bcrypt.DefaultCost)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate password: %s", err)
+			return nil, fmt.Errorf("failed to generate password: %w", err)
 		}
 
 		htpasswdPath := filepath.Join(workspaceDir, testRegistryHtpasswdFileBasename)
 		if err = os.WriteFile(htpasswdPath, []byte(fmt.Sprintf("%s:%s\n", testRegistryUsername, string(pwBytes))), 0644); err != nil {
-			return nil, fmt.Errorf("failed to create htpasswd file: %s", err)
+			return nil, fmt.Errorf("failed to create htpasswd file: %w", err)
 		}
 
 		// Registry config
@@ -210,7 +210,7 @@ func setupRegistryServer(ctx context.Context, workspaceDir string, opts registry
 		// add TLS configured HTTP client option to clientOpts
 		httpClient, err := tlsConfiguredHTTPCLient()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create TLS configured HTTP client: %s", err)
+			return nil, fmt.Errorf("failed to create TLS configured HTTP client: %w", err)
 		}
 		clientOpts = append(clientOpts, helmreg.ClientOptHTTPClient(httpClient))
 	} else {
@@ -230,7 +230,7 @@ func setupRegistryServer(ctx context.Context, workspaceDir string, opts registry
 	// init test client
 	helmClient, err := helmreg.NewClient(clientOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create registry client: %s", err)
+		return nil, fmt.Errorf("failed to create registry client: %w", err)
 	}
 	server.registryClient = helmClient
 
@@ -247,7 +247,7 @@ func tlsConfiguredHTTPCLient() (*http.Client, error) {
 	}
 	cert, err := tls.LoadX509KeyPair("testdata/certs/server.pem", "testdata/certs/server-key.pem")
 	if err != nil {
-		return nil, fmt.Errorf("failed to load server certificate: %s", err)
+		return nil, fmt.Errorf("failed to load server certificate: %w", err)
 	}
 	httpClient := &http.Client{
 		Transport: &http.Transport{

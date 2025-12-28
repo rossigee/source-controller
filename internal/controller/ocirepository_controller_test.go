@@ -904,7 +904,7 @@ func TestOCIRepository_CertSecret(t *testing.T) {
 			expectedstatusmessage: "tls: failed to verify certificate: x509:",
 		},
 		{
-			name:   "test connection with with incorrect private key",
+			name:   "test connection with incorrect private key",
 			url:    pi.url,
 			digest: pi.digest,
 			certSecret: &corev1.Secret{
@@ -1690,11 +1690,11 @@ func TestOCIRepository_reconcileSource_verifyOCISourceTrustPolicyNotation(t *tes
 			useDigest:             true,
 			want:                  sreconcile.ResultEmpty,
 			wantErr:               true,
-			wantErrMsg:            "failed to verify the signature using provider 'notation': signature verification failed\nfailed to verify signature with digest <sigrevision>, signing certificate from the digital signature does not match the X.509 trusted identities [map[\"C\":\"US\" \"CN\":\"example.com\" \"L\":\"Seattle\" \"O\":\"Notary\" \"ST\":\"WA\"]] defined in the trust policy \"test-statement-name\"",
+			wantErrMsg:            "failed to verify the signature using provider 'notation': signature verification failed\ncould not verify signature with digest <sigrevision>, signing certificate from the digital signature does not match the X.509 trusted identities [map[\"C\":\"US\" \"CN\":\"example.com\" \"L\":\"Seattle\" \"O\":\"Notary\" \"ST\":\"WA\"]] defined in the trust policy \"test-statement-name\"",
 			assertConditions: []metav1.Condition{
 				*conditions.TrueCondition(meta.ReconcilingCondition, meta.ProgressingReason, "building artifact: new revision '<revision>' for '<url>'"),
 				*conditions.UnknownCondition(meta.ReadyCondition, meta.ProgressingReason, "building artifact: new revision '<revision>' for '<url>'"),
-				*conditions.FalseCondition(sourcev1.SourceVerifiedCondition, sourcev1.VerificationError, "failed to verify the signature using provider 'notation': signature verification failed\nfailed to verify signature with digest <sigrevision>, signing certificate from the digital signature does not match the X.509 trusted identities [map[\"C\":\"US\" \"CN\":\"example.com\" \"L\":\"Seattle\" \"O\":\"Notary\" \"ST\":\"WA\"]] defined in the trust policy \"test-statement-name\""),
+				*conditions.FalseCondition(sourcev1.SourceVerifiedCondition, sourcev1.VerificationError, "failed to verify the signature using provider 'notation': signature verification failed\ncould not verify signature with digest <sigrevision>, signing certificate from the digital signature does not match the X.509 trusted identities [map[\"C\":\"US\" \"CN\":\"example.com\" \"L\":\"Seattle\" \"O\":\"Notary\" \"ST\":\"WA\"]] defined in the trust policy \"test-statement-name\""),
 			},
 		},
 		{

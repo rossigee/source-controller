@@ -43,9 +43,9 @@ import (
 )
 
 var (
-	// ErrorDirectoryExists is an error returned when the filename provided
+	// ErrDirectoryExists is an error returned when the filename provided
 	// is a directory.
-	ErrorDirectoryExists = errors.New("filename is a directory")
+	ErrDirectoryExists = errors.New("filename is a directory")
 )
 
 const (
@@ -276,7 +276,7 @@ func (c *BlobClient) FGetObject(ctx context.Context, bucketName, objectName, loc
 	if err == nil {
 		// If the destination exists and is a directory.
 		if dirStatus.IsDir() {
-			return "", ErrorDirectoryExists
+			return "", ErrDirectoryExists
 		}
 	}
 
@@ -430,14 +430,14 @@ func sasTokenFromSecret(ep string, secret *corev1.Secret) (string, error) {
 		if err != nil {
 			maskedErrorString, maskErr := masktoken.MaskTokenFromString(err.Error(), string(sasKey))
 			if maskErr != nil {
-				return "", fmt.Errorf("error redacting token from error message: %s", maskErr)
+				return "", fmt.Errorf("error redacting token from error message: %w", maskErr)
 			}
 			return "", fmt.Errorf("unable to parse SAS token: %s", maskedErrorString)
 		}
 
 		epURL, err := url.Parse(ep)
 		if err != nil {
-			return "", fmt.Errorf("unable to parse endpoint URL: %s", err)
+			return "", fmt.Errorf("unable to parse endpoint URL: %w", err)
 		}
 
 		//merge the query values in the endpoint with the token

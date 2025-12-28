@@ -147,7 +147,7 @@ func copyFile(src, dst string) (err error) {
 	if err != nil {
 		return
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	out, err := os.Create(dst)
 	if err != nil {
@@ -155,7 +155,7 @@ func copyFile(src, dst string) (err error) {
 	}
 
 	if _, err = io.Copy(out, in); err != nil {
-		out.Close()
+		_ = out.Close()
 		return
 	}
 

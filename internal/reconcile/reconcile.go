@@ -74,14 +74,14 @@ type AlwaysRequeueResultBuilder struct {
 func (r AlwaysRequeueResultBuilder) BuildRuntimeResult(rr Result, err error) ctrl.Result {
 	// Handle special errors that contribute to expressing the result.
 	switch e := err.(type) {
-	case *serror.Waiting:
+	case *serror.WaitingError:
 		// Safeguard: If no RequeueAfter is set, use the default success
 		// RequeueAfter value to ensure a requeue takes place after some time.
 		if e.RequeueAfter == 0 {
 			return ctrl.Result{RequeueAfter: r.RequeueAfter}
 		}
 		return ctrl.Result{RequeueAfter: e.RequeueAfter}
-	case *serror.Generic:
+	case *serror.GenericError:
 		// no-op error, reconcile at success interval.
 		if e.Ignore {
 			return ctrl.Result{RequeueAfter: r.RequeueAfter}
@@ -93,6 +93,8 @@ func (r AlwaysRequeueResultBuilder) BuildRuntimeResult(rr Result, err error) ctr
 		return ctrl.Result{Requeue: true}
 	case ResultSuccess:
 		return ctrl.Result{RequeueAfter: r.RequeueAfter}
+	case ResultEmpty:
+		return ctrl.Result{}
 	default:
 		return ctrl.Result{}
 	}
@@ -135,7 +137,7 @@ func ComputeReconcileResult(obj conditions.Setter, res Result, recErr error, rb 
 
 	// Analyze the reconcile error.
 	switch t := recErr.(type) {
-	case *serror.Stalling:
+	case *serror.StallingError:
 		if res == ResultEmpty {
 			conditions.MarkStalled(obj, t.Reason, "%s", t.Error())
 			// The current generation has been reconciled successfully and it
@@ -146,13 +148,13 @@ func ComputeReconcileResult(obj conditions.Setter, res Result, recErr error, rb 
 		}
 		// NOTE: Non-empty result with stalling error indicates that the
 		// returned result is incorrect.
-	case *serror.Waiting:
+	case *serror.WaitingError:
 		// The reconcile resulted in waiting error, remove stalled condition if
 		// present.
 		conditions.Delete(obj, meta.StalledCondition)
 		// The reconciler needs to wait and retry. Return no error.
 		return pOpts, result, nil
-	case *serror.Generic:
+	case *serror.GenericError:
 		conditions.Delete(obj, meta.StalledCondition)
 		// If ignore, it's a no-op error, return no error, remove reconciling
 		// condition.

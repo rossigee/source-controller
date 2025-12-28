@@ -159,7 +159,7 @@ func (s trustStore) GetCertificates(ctx context.Context, storeType truststore.Ty
 
 		cert, err := x509.ParseCertificates(raw)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse certificate '%s': %s", namedStore, err)
+			return nil, fmt.Errorf("failed to parse certificate '%s': %w", namedStore, err)
 		}
 
 		certs = append(certs, cert...)

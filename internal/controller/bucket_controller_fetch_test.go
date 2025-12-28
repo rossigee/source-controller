@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,7 +67,7 @@ func (m mockBucketClient) FGetObject(_ context.Context, bucket, obj, path string
 }
 
 func (m mockBucketClient) ObjectIsNotFound(e error) bool {
-	return e == errMockNotFound
+	return errors.Is(e, errMockNotFound)
 }
 
 func (m mockBucketClient) VisitObjects(_ context.Context, _ string, _ string, f func(key, etag string) error) error {

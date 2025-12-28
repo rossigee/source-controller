@@ -44,13 +44,13 @@ type ExponentialBackoffResultBuilder struct {
 func (r ExponentialBackoffResultBuilder) BuildRuntimeResult(rr Result, err error) ctrl.Result {
 	// Handle special errors that contribute to expressing the result.
 	switch e := err.(type) {
-	case *serror.Waiting:
+	case *serror.WaitingError:
 		// Safeguard: If no RequeueAfter is set, use exponential backoff
 		if e.RequeueAfter == 0 {
 			return ctrl.Result{RequeueAfter: r.calculateBackoff()}
 		}
 		return ctrl.Result{RequeueAfter: e.RequeueAfter}
-	case *serror.Generic:
+	case *serror.GenericError:
 		// For non-ignored errors, use exponential backoff
 		if !e.Ignore {
 			return ctrl.Result{RequeueAfter: r.calculateBackoff()}
@@ -73,6 +73,8 @@ func (r ExponentialBackoffResultBuilder) BuildRuntimeResult(rr Result, err error
 		return ctrl.Result{Requeue: true}
 	case ResultSuccess:
 		return ctrl.Result{RequeueAfter: r.RequeueAfter}
+	case ResultEmpty:
+		return ctrl.Result{}
 	default:
 		return ctrl.Result{}
 	}

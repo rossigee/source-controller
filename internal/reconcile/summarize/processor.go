@@ -51,17 +51,17 @@ func RecordReconcileReq(ctx context.Context, recorder kuberecorder.EventRecorder
 // action handlers can be added here.
 func ErrorActionHandler(ctx context.Context, recorder kuberecorder.EventRecorder, obj client.Object, _ reconcile.Result, err error) {
 	switch e := err.(type) {
-	case *serror.Generic:
+	case *serror.GenericError:
 		if e.Log {
 			logError(ctx, e.Config.Event, e, e.Error())
 		}
 		recordEvent(recorder, obj, e.Config.Event, e.Config.Notification, err, e.Reason)
-	case *serror.Waiting:
+	case *serror.WaitingError:
 		if e.Log {
 			logError(ctx, e.Config.Event, e, "reconciliation waiting", "reason", e.Err, "duration", e.RequeueAfter)
 		}
 		recordEvent(recorder, obj, e.Config.Event, e.Config.Notification, err, e.Reason)
-	case *serror.Stalling:
+	case *serror.StallingError:
 		if e.Log {
 			logError(ctx, e.Config.Event, e, "reconciliation stalled")
 		}

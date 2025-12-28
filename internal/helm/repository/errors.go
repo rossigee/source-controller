@@ -16,32 +16,32 @@ limitations under the License.
 
 package repository
 
-// ErrReference indicate invalid chart reference.
-type ErrReference struct {
+// ReferenceError indicate invalid chart reference.
+type ReferenceError struct {
 	Err error
 }
 
 // Error implements the error interface.
-func (er *ErrReference) Error() string {
+func (er *ReferenceError) Error() string {
 	return er.Err.Error()
 }
 
 // Unwrap returns the underlying error.
-func (er *ErrReference) Unwrap() error {
+func (er *ReferenceError) Unwrap() error {
 	return er.Err
 }
 
-// ErrExternal is a generic error for errors related to external API calls.
-type ErrExternal struct {
+// ExternalError is a generic error for errors related to external API calls.
+type ExternalError struct {
 	Err error
 }
 
 // Error implements the error interface.
-func (ee *ErrExternal) Error() string {
+func (ee *ExternalError) Error() string {
 	return ee.Err.Error()
 }
 
 // Unwrap returns the underlying error.
-func (ee *ErrExternal) Unwrap() error {
+func (ee *ExternalError) Unwrap() error {
 	return ee.Err
 }

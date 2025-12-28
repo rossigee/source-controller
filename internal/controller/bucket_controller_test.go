@@ -55,6 +55,16 @@ import (
 // Environment variable to set the GCP Storage host for the GCP client.
 const EnvGcpStorageHost = "STORAGE_EMULATOR_HOST"
 
+// Test constants
+const (
+	testReconcileAtAnnotation = "now"
+	testEmptyDigestFile       = "empty-digest.txt"
+	testDigestMismatchFile    = "digest-mismatch.txt"
+	testDigest                = "sha256:6c329d5322473f904e2f908a51c12efa0ca8aa4201dd84f2c9d203a6ab3e9023"
+	testProviderGeneric       = "generic"
+	testInvalidBucketName     = "invalid"
+)
+
 func TestBucketReconciler_deleteBeforeFinalizer(t *testing.T) {
 	g := NewWithT(t)
 
@@ -121,7 +131,7 @@ func TestBucketReconciler_Reconcile(t *testing.T) {
 		},
 	}
 	g.Expect(testEnv.Create(ctx, secret)).To(Succeed())
-	defer testEnv.Delete(ctx, secret)
+	defer func() { _ = testEnv.Delete(ctx, secret) }()
 
 	origObj := &sourcev1.Bucket{
 		ObjectMeta: metav1.ObjectMeta{
@@ -172,7 +182,7 @@ func TestBucketReconciler_Reconcile(t *testing.T) {
 	patchHelper, err := patch.NewHelper(obj, testEnv.Client)
 	g.Expect(err).ToNot(HaveOccurred())
 	annotations := map[string]string{
-		meta.ReconcileRequestAnnotation: "now",
+		meta.ReconcileRequestAnnotation: testReconcileAtAnnotation,
 	}
 	obj.SetAnnotations(annotations)
 	g.Expect(patchHelper.Patch(ctx, obj)).ToNot(HaveOccurred())
@@ -180,7 +190,7 @@ func TestBucketReconciler_Reconcile(t *testing.T) {
 		if err := testEnv.Get(ctx, key, obj); err != nil {
 			return false
 		}
-		return obj.Status.LastHandledReconcileAt == "now"
+		return obj.Status.LastHandledReconcileAt == testReconcileAtAnnotation
 	}, timeout).Should(BeTrue())
 
 	g.Expect(testEnv.Delete(ctx, obj)).To(Succeed())
@@ -275,7 +285,7 @@ func TestBucketReconciler_reconcileStorage(t *testing.T) {
 		{
 			name: "notices empty artifact digest",
 			beforeFunc: func(obj *sourcev1.Bucket, storage *Storage) error {
-				f := "empty-digest.txt"
+				f := testEmptyDigestFile
 
 				obj.Status.Artifact = &sourcev1.Artifact{
 					Path:     fmt.Sprintf("/reconcile-storage/%s.txt", f),
@@ -296,7 +306,7 @@ func TestBucketReconciler_reconcileStorage(t *testing.T) {
 			},
 			want: sreconcile.ResultSuccess,
 			assertPaths: []string{
-				"!/reconcile-storage/empty-digest.txt",
+				fmt.Sprintf("!/reconcile-storage/%s.txt", testEmptyDigestFile),
 			},
 			assertConditions: []metav1.Condition{
 				*conditions.TrueCondition(meta.ReconcilingCondition, meta.ProgressingReason, "building artifact: disappeared from storage"),
@@ -306,7 +316,7 @@ func TestBucketReconciler_reconcileStorage(t *testing.T) {
 		{
 			name: "notices artifact digest mismatch",
 			beforeFunc: func(obj *sourcev1.Bucket, storage *Storage) error {
-				f := "digest-mismatch.txt"
+				f := testDigestMismatchFile
 
 				obj.Status.Artifact = &sourcev1.Artifact{
 					Path:     fmt.Sprintf("/reconcile-storage/%s.txt", f),
@@ -321,13 +331,13 @@ func TestBucketReconciler_reconcileStorage(t *testing.T) {
 				}
 
 				// Overwrite with a different digest
-				obj.Status.Artifact.Digest = "sha256:6c329d5322473f904e2f908a51c12efa0ca8aa4201dd84f2c9d203a6ab3e9023"
+				obj.Status.Artifact.Digest = testDigest
 
 				return nil
 			},
 			want: sreconcile.ResultSuccess,
 			assertPaths: []string{
-				"!/reconcile-storage/digest-mismatch.txt",
+				fmt.Sprintf("!/reconcile-storage/%s.txt", testDigestMismatchFile),
 			},
 			assertConditions: []metav1.Condition{
 				*conditions.TrueCondition(meta.ReconcilingCondition, meta.ProgressingReason, "building artifact: disappeared from storage"),
@@ -618,7 +628,7 @@ func TestBucketReconciler_reconcileSource_generic(t *testing.T) {
 				},
 			},
 			beforeFunc: func(obj *sourcev1.Bucket) {
-				obj.Spec.Provider = "generic"
+				obj.Spec.Provider = testProviderGeneric
 				obj.Spec.STS = &sourcev1.BucketSTSSpec{
 					Provider:  "ldap",
 					Endpoint:  "https://something",
@@ -662,7 +672,7 @@ func TestBucketReconciler_reconcileSource_generic(t *testing.T) {
 				},
 			},
 			beforeFunc: func(obj *sourcev1.Bucket) {
-				obj.Spec.Provider = "generic"
+				obj.Spec.Provider = testProviderGeneric
 				obj.Spec.STS = &sourcev1.BucketSTSSpec{
 					Provider:      "ldap",
 					Endpoint:      "https://something",
@@ -683,7 +693,7 @@ func TestBucketReconciler_reconcileSource_generic(t *testing.T) {
 			name:       "Observes non-existing bucket name",
 			bucketName: "dummy",
 			beforeFunc: func(obj *sourcev1.Bucket) {
-				obj.Spec.BucketName = "invalid"
+				obj.Spec.BucketName = testInvalidBucketName
 				conditions.MarkReconciling(obj, meta.ProgressingReason, "foo")
 				conditions.MarkUnknown(obj, meta.ReadyCondition, "foo", "bar")
 			},
@@ -699,7 +709,7 @@ func TestBucketReconciler_reconcileSource_generic(t *testing.T) {
 			name:       "Observes incompatible sts.provider",
 			bucketName: "dummy",
 			beforeFunc: func(obj *sourcev1.Bucket) {
-				obj.Spec.Provider = "generic"
+				obj.Spec.Provider = testProviderGeneric
 				obj.Spec.STS = &sourcev1.BucketSTSSpec{
 					Provider: "aws",
 				}
@@ -718,7 +728,7 @@ func TestBucketReconciler_reconcileSource_generic(t *testing.T) {
 			name:       "Observes invalid sts.endpoint",
 			bucketName: "dummy",
 			beforeFunc: func(obj *sourcev1.Bucket) {
-				obj.Spec.Provider = "generic"
+				obj.Spec.Provider = testProviderGeneric
 				obj.Spec.STS = &sourcev1.BucketSTSSpec{
 					Provider: "ldap",
 					Endpoint: "something\t",
@@ -1106,7 +1116,7 @@ func TestBucketReconciler_reconcileSource_gcs(t *testing.T) {
 			name:       "Observes non-existing bucket name",
 			bucketName: "dummy",
 			beforeFunc: func(obj *sourcev1.Bucket) {
-				obj.Spec.BucketName = "invalid"
+				obj.Spec.BucketName = testInvalidBucketName
 				conditions.MarkReconciling(obj, meta.ProgressingReason, "foo")
 				conditions.MarkUnknown(obj, meta.ReadyCondition, "foo", "bar")
 			},

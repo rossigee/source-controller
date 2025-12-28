@@ -101,6 +101,10 @@ func tlsClientConfigFromSecret(secret corev1.Secret, url string, kubernetesTLSKe
 		// Since a real Kubernetes Secret is of type Opaque by default, its safe to allow this.
 		switch secret.Type {
 		case corev1.SecretTypeOpaque, corev1.SecretTypeTLS, "":
+			// Valid secret types for TLS configuration
+		case corev1.SecretTypeServiceAccountToken, corev1.SecretTypeDockercfg, corev1.SecretTypeDockerConfigJson, corev1.SecretTypeBasicAuth, corev1.SecretTypeSSHAuth, corev1.SecretTypeBootstrapToken:
+			// Invalid secret types for TLS configuration
+			fallthrough
 		default:
 			return nil, nil, fmt.Errorf("cannot use secret '%s' to construct TLS config: invalid secret type: '%s'", secret.Name, secret.Type)
 		}

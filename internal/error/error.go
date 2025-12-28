@@ -45,17 +45,17 @@ type Config struct {
 	// Warning event - error log
 	Log bool
 	// Notification is used to emit an error as a notification alert to a
-	// a notification service.
+	// notification service.
 	Notification bool
 	// Ignore is used to suppress the error for no-op reconciliations. It may
 	// be applicable to non-contextual errors only.
 	Ignore bool
 }
 
-// Stalling is the reconciliation stalled state error. It contains an error
+// StallingError is the reconciliation stalled state error. It contains an error
 // and a reason for the stalled condition. It is a contextual error, used to
 // express the scenario which contributed to the reconciliation result.
-type Stalling struct {
+type StallingError struct {
 	// Reason is the stalled condition reason string.
 	Reason string
 	// Err is the error that caused stalling. This can be used as the message in
@@ -66,20 +66,20 @@ type Stalling struct {
 }
 
 // Error implements error interface.
-func (se *Stalling) Error() string {
+func (se *StallingError) Error() string {
 	return se.Err.Error()
 }
 
 // Unwrap returns the underlying error.
-func (se *Stalling) Unwrap() error {
+func (se *StallingError) Unwrap() error {
 	return se.Err
 }
 
-// NewStalling constructs a new Stalling error with default configuration.
-func NewStalling(err error, reason string) *Stalling {
+// NewStalling constructs a new StallingError error with default configuration.
+func NewStalling(err error, reason string) *StallingError {
 	// Stalling errors are not returned to the runtime. Log it explicitly.
 	// Since this failure requires user interaction, send warning notification.
-	return &Stalling{
+	return &StallingError{
 		Reason: reason,
 		Err:    err,
 		Config: Config{
@@ -90,12 +90,12 @@ func NewStalling(err error, reason string) *Stalling {
 	}
 }
 
-// Waiting is the reconciliation wait state error. It contains an error, wait
+// WaitingError is the reconciliation wait state error. It contains an error, wait
 // duration and a reason for the wait. It is a contextual error, used to express
 // the scenario which contributed to the reconciliation result.
 // It is for scenarios where a reconciliation needs to wait for something else
 // to take place first.
-type Waiting struct {
+type WaitingError struct {
 	// RequeueAfter is the wait duration after which to requeue.
 	RequeueAfter time.Duration
 	// Reason is the reason for the wait.
@@ -107,21 +107,21 @@ type Waiting struct {
 }
 
 // Error implements error interface.
-func (we *Waiting) Error() string {
+func (we *WaitingError) Error() string {
 	return we.Err.Error()
 }
 
 // Unwrap returns the underlying error.
-func (we *Waiting) Unwrap() error {
+func (we *WaitingError) Unwrap() error {
 	return we.Err
 }
 
-// NewWaiting constructs a new Waiting error with default configuration.
-func NewWaiting(err error, reason string) *Waiting {
+// NewWaiting constructs a new WaitingError error with default configuration.
+func NewWaiting(err error, reason string) *WaitingError {
 	// Waiting errors are not returned to the runtime. Log it explicitly.
 	// Since this failure results in reconciliation delay, send warning
 	// notification.
-	return &Waiting{
+	return &WaitingError{
 		Reason: reason,
 		Err:    err,
 		Config: Config{
@@ -131,9 +131,9 @@ func NewWaiting(err error, reason string) *Waiting {
 	}
 }
 
-// Generic error is a generic reconcile error. It can be used in scenarios that
+// GenericError is a generic reconcile error. It can be used in scenarios that
 // don't have any special contextual meaning.
-type Generic struct {
+type GenericError struct {
 	// Reason is the reason for the generic error.
 	Reason string
 	// Error is the error that caused the generic error.
@@ -143,20 +143,20 @@ type Generic struct {
 }
 
 // Error implements error interface.
-func (g *Generic) Error() string {
+func (g *GenericError) Error() string {
 	return g.Err.Error()
 }
 
 // Unwrap returns the underlying error.
-func (g *Generic) Unwrap() error {
+func (g *GenericError) Unwrap() error {
 	return g.Err
 }
 
-// NewGeneric constructs a new Generic error with default configuration.
-func NewGeneric(err error, reason string) *Generic {
+// NewGeneric constructs a new GenericError error with default configuration.
+func NewGeneric(err error, reason string) *GenericError {
 	// Since it's a generic error, it'll be returned to the runtime and logged
 	// automatically, do not log it. Send failure notification.
-	return &Generic{
+	return &GenericError{
 		Reason: reason,
 		Err:    err,
 		Config: Config{

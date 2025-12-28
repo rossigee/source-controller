@@ -40,8 +40,8 @@ The formatting rules are as follows:
 
 Example:
 
-	# Match any file named foo.txt
-	foo.txt
+	# Match any file named bar.txt
+	bar.txt
 
 	# Match any text file
 	*.txt
@@ -52,8 +52,8 @@ Example:
 	# Match only text files in the top-level directory
 	/*.txt
 
-	# Match only the file foo.txt in the top-level directory
-	/foo.txt
+	# Match only the file bar.txt in the top-level directory
+	/bar.txt
 
 	# Match any file named ab.txt, ac.txt, or ad.txt
 	a[b-d].txt

@@ -127,7 +127,7 @@ func TestHelmChartReconciler_Reconcile(t *testing.T) {
 
 	serverFactory, err := helmtestserver.NewTempHelmServer()
 	g.Expect(err).NotTo(HaveOccurred())
-	defer os.RemoveAll(serverFactory.Root())
+	defer func() { _ = os.RemoveAll(serverFactory.Root()) }()
 
 	g.Expect(serverFactory.PackageChartWithVersion(chartPath, chartVersion)).To(Succeed())
 	g.Expect(serverFactory.GenerateIndex()).To(Succeed())
@@ -669,7 +669,7 @@ func TestHelmChartReconciler_reconcileSource(t *testing.T) {
 				conditions.MarkUnknown(obj, meta.ReadyCondition, "foo", "bar")
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Generic{Err: errors.New("gitrepositories.source.toolkit.fluxcd.io \"unavailable\" not found")},
+			wantErr: &serror.GenericError{Err: errors.New("gitrepositories.source.toolkit.fluxcd.io \"unavailable\" not found")},
 			assertFunc: func(g *WithT, build chart.Build, obj sourcev1.HelmChart) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -691,7 +691,7 @@ func TestHelmChartReconciler_reconcileSource(t *testing.T) {
 				conditions.MarkUnknown(obj, meta.ReadyCondition, meta.ProgressingReason, "foo")
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Stalling{Err: errors.New("unsupported source kind 'Unsupported'")},
+			wantErr: &serror.StallingError{Err: errors.New("unsupported source kind 'Unsupported'")},
 			assertFunc: func(g *WithT, build chart.Build, obj sourcev1.HelmChart) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -724,7 +724,7 @@ func TestHelmChartReconciler_reconcileSource(t *testing.T) {
 				conditions.MarkUnknown(obj, meta.ReadyCondition, meta.ProgressingReason, "foo")
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Stalling{Err: errors.New("values files merge error: no values file found at path")},
+			wantErr: &serror.StallingError{Err: errors.New("values files merge error: no values file found at path")},
 			assertFunc: func(g *WithT, build chart.Build, obj sourcev1.HelmChart) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -842,7 +842,7 @@ func TestHelmChartReconciler_buildFromHelmRepository(t *testing.T) {
 
 	serverFactory, err := helmtestserver.NewTempHelmServer()
 	g.Expect(err).NotTo(HaveOccurred())
-	defer os.RemoveAll(serverFactory.Root())
+	defer func() { _ = os.RemoveAll(serverFactory.Root()) }()
 
 	for _, ver := range []string{chartVersion, higherChartVersion} {
 		g.Expect(serverFactory.PackageChartWithVersion(chartPath, ver)).To(Succeed())
@@ -1035,7 +1035,7 @@ func TestHelmChartReconciler_buildFromHelmRepository(t *testing.T) {
 				}
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Generic{Err: errors.New("failed to get authentication secret: secrets \"invalid\" not found")},
+			wantErr: &serror.GenericError{Err: errors.New("failed to get authentication secret: secrets \"invalid\" not found")},
 			assertFunc: func(g *WithT, obj *sourcev1.HelmChart, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -1050,7 +1050,7 @@ func TestHelmChartReconciler_buildFromHelmRepository(t *testing.T) {
 				repository.Spec.URL = "file://unsupported" // Unsupported protocol
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Stalling{Err: errors.New("scheme \"file\" not supported")},
+			wantErr: &serror.StallingError{Err: errors.New("scheme \"file\" not supported")},
 			assertFunc: func(g *WithT, obj *sourcev1.HelmChart, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -1065,7 +1065,7 @@ func TestHelmChartReconciler_buildFromHelmRepository(t *testing.T) {
 				repository.Spec.URL = "://unsupported" // Invalid URL
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Stalling{Err: errors.New("missing protocol scheme")},
+			wantErr: &serror.StallingError{Err: errors.New("missing protocol scheme")},
 			assertFunc: func(g *WithT, obj *sourcev1.HelmChart, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -1304,7 +1304,7 @@ func TestHelmChartReconciler_buildFromOCIHelmRepository(t *testing.T) {
 				}
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Generic{Err: errors.New("failed to get authentication secret: secrets \"invalid\" not found")},
+			wantErr: &serror.GenericError{Err: errors.New("failed to get authentication secret: secrets \"invalid\" not found")},
 			assertFunc: func(g *WithT, obj *sourcev1.HelmChart, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -1319,7 +1319,7 @@ func TestHelmChartReconciler_buildFromOCIHelmRepository(t *testing.T) {
 				repository.Spec.URL = "https://unsupported" // Unsupported protocol
 			},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Stalling{Err: errors.New("failed to construct Helm client: invalid OCI registry URL: https://unsupported")},
+			wantErr: &serror.StallingError{Err: errors.New("failed to construct Helm client: invalid OCI registry URL: https://unsupported")},
 			assertFunc: func(g *WithT, obj *sourcev1.HelmChart, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 
@@ -1562,7 +1562,7 @@ func TestHelmChartReconciler_buildFromTarballArtifact(t *testing.T) {
 			name:    "Empty source artifact",
 			source:  sourcev1.Artifact{},
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Generic{Err: errors.New("no such file or directory")},
+			wantErr: &serror.GenericError{Err: errors.New("no such file or directory")},
 			assertFunc: func(g *WithT, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 			},
@@ -1571,7 +1571,7 @@ func TestHelmChartReconciler_buildFromTarballArtifact(t *testing.T) {
 			name:    "Invalid artifact type",
 			source:  *yamlArtifact,
 			want:    sreconcile.ResultEmpty,
-			wantErr: &serror.Generic{Err: errors.New("artifact untar error: requires gzip-compressed body")},
+			wantErr: &serror.GenericError{Err: errors.New("artifact untar error: requires gzip-compressed body")},
 			assertFunc: func(g *WithT, build chart.Build) {
 				g.Expect(build.Complete()).To(BeFalse())
 			},
@@ -2149,10 +2149,10 @@ func mockChartBuild(name, version, path string, valuesFiles []string) *chart.Bui
 	if path != "" {
 		f, err := os.Open(path)
 		if err == nil {
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 			ff, err := os.CreateTemp("", "chart-mock-*.tgz")
 			if err == nil {
-				defer ff.Close()
+				defer func() { _ = ff.Close() }()
 				if _, err = io.Copy(ff, f); err == nil {
 					copyP = ff.Name()
 				}

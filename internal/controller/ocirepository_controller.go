@@ -459,7 +459,7 @@ func (r *OCIRepositoryReconciler) reconcileSource(ctx context.Context, sp *patch
 	}
 
 	// Get the upstream revision from the artifact digest
-	// TODO: getRevision resolves the digest, which may change before image is fetched, so it should probaly update ref
+	// TODO: getRevision resolves the digest, which may change before image is fetched, so it should probably update ref
 	revision, err := r.getRevision(ref, opts)
 	if err != nil {
 		e := serror.NewGeneric(
@@ -1183,9 +1183,9 @@ func (r *OCIRepositoryReconciler) reconcileStorage(ctx context.Context, sp *patc
 
 	// Record that we do not have an artifact
 	if obj.GetArtifact() == nil {
-		msg := "building artifact"
+		msg := buildingArtifactMsg
 		if artifactMissing {
-			msg += ": disappeared from storage"
+			msg = buildingArtifactDisappearedMsg
 		}
 		rreconcile.ProgressiveStatus(true, obj, meta.ProgressingReason, "%s", msg)
 		conditions.Delete(obj, sourcev1.ArtifactInStorageCondition)
@@ -1294,7 +1294,7 @@ func (r *OCIRepositoryReconciler) reconcileArtifact(ctx context.Context, sp *pat
 
 		if err := r.Storage.Archive(&artifact, dir, SourceIgnoreFilter(ps, ignoreDomain)); err != nil {
 			e := serror.NewGeneric(
-				fmt.Errorf("unable to archive artifact to storage: %s", err),
+				fmt.Errorf("unable to archive artifact to storage: %w", err),
 				sourcev1.ArchiveOperationFailedReason,
 			)
 			conditions.MarkTrue(obj, sourcev1.StorageOperationFailedCondition, e.Reason, "%s", e)

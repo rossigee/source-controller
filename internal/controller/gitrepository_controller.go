@@ -369,7 +369,7 @@ func (r *GitRepositoryReconciler) shouldNotify(oldObj, newObj *sourcev1.GitRepos
 	// Notify for no-op reconciliation with ignore error.
 	if resErr != nil && res == sreconcile.ResultEmpty && newObj.Status.Artifact != nil {
 		// Convert to Generic error and check for ignore.
-		if ge, ok := resErr.(*serror.Generic); ok {
+		if ge, ok := resErr.(*serror.GenericError); ok {
 			return ge.Ignore
 		}
 	}
@@ -422,9 +422,9 @@ func (r *GitRepositoryReconciler) reconcileStorage(ctx context.Context, sp *patc
 
 	// Record that we do not have an artifact
 	if obj.GetArtifact() == nil {
-		msg := "building artifact"
+		msg := buildingArtifactMsg
 		if artifactMissing {
-			msg += ": disappeared from storage"
+			msg = buildingArtifactDisappearedMsg
 		}
 		rreconcile.ProgressiveStatus(true, obj, meta.ProgressingReason, "%s", msg)
 		conditions.Delete(obj, sourcev1.ArtifactInStorageCondition)
@@ -556,7 +556,7 @@ func (r *GitRepositoryReconciler) reconcileSource(ctx context.Context, sp *patch
 		// Check if the content config contributing to the artifact has changed.
 		if !gitContentConfigChanged(obj, includes) {
 			ge := serror.NewGeneric(
-				fmt.Errorf("no changes since last reconcilation: observed revision '%s'",
+				fmt.Errorf("no changes since last reconciliation: observed revision '%s'",
 					commitReference(obj, commit)), sourcev1.GitOperationSucceedReason,
 			)
 			ge.Notification = false

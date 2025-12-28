@@ -23,10 +23,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestBuildErrorReason_Error(t *testing.T) {
+func TestBuildReasonError_Error(t *testing.T) {
 	g := NewWithT(t)
 
-	err := BuildErrorReason{"Reason", "reason"}
+	err := BuildReasonError{"Reason", "reason"}
 	g.Expect(err.Error()).To(Equal("reason"))
 }
 
@@ -39,7 +39,7 @@ func TestBuildError_Error(t *testing.T) {
 		{
 			name: "with reason",
 			err: &BuildError{
-				Reason: BuildErrorReason{"Reason", "reason"},
+				Reason: BuildReasonError{"Reason", "reason"},
 				Err:    errors.New("error"),
 			},
 			want: "reason: error",

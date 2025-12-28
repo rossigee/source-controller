@@ -39,14 +39,6 @@ type PseudoSymlink struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// LegacyStorageAdapter adapts the new StorageProvider interface to the legacy controller.Storage
-// for backwards compatibility with existing reconcilers.
-type LegacyStorageAdapter struct {
-	provider StorageProvider
-	basePath string
-	hostname string
-}
-
 // Ensure ProviderStorage implements controller.StorageInterface
 var _ controller.StorageInterface = (*ProviderStorage)(nil)
 

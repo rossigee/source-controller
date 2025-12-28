@@ -19,7 +19,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"time"
@@ -337,17 +336,6 @@ func main() {
 	}
 }
 
-func startFileServer(path string, address string) {
-	setupLog.Info("starting file server")
-	fs := http.FileServer(http.Dir(path))
-	mux := http.NewServeMux()
-	mux.Handle("/", fs)
-	err := http.ListenAndServe(address, mux)
-	if err != nil {
-		setupLog.Error(err, "file server error")
-	}
-}
-
 func mustSetupEventRecorder(mgr ctrl.Manager, eventsAddr, controllerName string) record.EventRecorder {
 	eventRecorder, err := events.NewRecorder(mgr, ctrl.Log, eventsAddr, controllerName)
 	if err != nil {
@@ -505,29 +493,6 @@ func mustInitStorage(ctx context.Context, path string, storageAdvAddr string, ar
 	setupLog.Info("storage provider created successfully", "type", fmt.Sprintf("%T", provider))
 
 	return provider
-}
-
-func determineAdvStorageAddr(storageAddr string) string {
-	host, port, err := net.SplitHostPort(storageAddr)
-	if err != nil {
-		setupLog.Error(err, "unable to parse storage address")
-		os.Exit(1)
-	}
-	switch host {
-	case "":
-		host = "localhost"
-	case "0.0.0.0":
-		host = os.Getenv("HOSTNAME")
-		if host == "" {
-			hn, err := os.Hostname()
-			if err != nil {
-				setupLog.Error(err, "0.0.0.0 specified in storage addr but hostname is invalid")
-				os.Exit(1)
-			}
-			host = hn
-		}
-	}
-	return net.JoinHostPort(host, port)
 }
 
 func envOrDefault(envName, defaultValue string) string {

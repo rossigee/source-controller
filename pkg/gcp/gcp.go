@@ -37,12 +37,12 @@ import (
 )
 
 var (
-	// IteratorDone is returned when the looping of objects/content
+	// ErrIteratorDone is returned when the looping of objects/content
 	// has reached the end of the iteration.
-	IteratorDone = iterator.Done
-	// ErrorDirectoryExists is an error returned when the filename provided
+	ErrIteratorDone = iterator.Done
+	// ErrDirectoryExists is an error returned when the filename provided
 	// is a directory.
-	ErrorDirectoryExists = errors.New("filename is a directory")
+	ErrDirectoryExists = errors.New("filename is a directory")
 )
 
 // GCSClient is a minimal Google Cloud Storage client for fetching objects.
@@ -179,7 +179,7 @@ func (c *GCSClient) FGetObject(ctx context.Context, bucketName, objectName, loca
 	if err == nil {
 		// If the destination exists and is a directory.
 		if dirStatus.IsDir() {
-			return "", ErrorDirectoryExists
+			return "", ErrDirectoryExists
 		}
 	}
 
@@ -247,7 +247,7 @@ func (c *GCSClient) VisitObjects(ctx context.Context, bucketName string, prefix 
 	})
 	for {
 		object, err := items.Next()
-		if err == IteratorDone {
+		if err == ErrIteratorDone {
 			break
 		}
 		if err != nil {

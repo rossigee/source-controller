@@ -188,7 +188,7 @@ func TestSummarizeAndPatch(t *testing.T) {
 				conditions.MarkTrue(obj, sourcev1.FetchFailedCondition, sourcev1.FetchFailedCondition, "failed to construct client")
 			},
 			conditions:   []Conditions{testReadyConditions},
-			reconcileErr: &serror.Stalling{Err: fmt.Errorf("some error"), Reason: "some reason"},
+			reconcileErr: &serror.StallingError{Err: fmt.Errorf("some error"), Reason: "some reason"},
 			wantErr:      false,
 			assertConditions: []metav1.Condition{
 				*conditions.FalseCondition(meta.ReadyCondition, sourcev1.FetchFailedCondition, "failed to construct client"),
