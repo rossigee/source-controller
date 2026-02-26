@@ -1,5 +1,5 @@
-ARG GO_VERSION=1.24
-ARG XX_VERSION=1.6.1
+ARG GO_VERSION=1.26
+ARG XX_VERSION=1.9.0
 
 FROM --platform=$BUILDPLATFORM tonistiigi/xx:${XX_VERSION} AS xx
 
@@ -26,7 +26,6 @@ RUN go mod download
 
 # Copy source code
 COPY main.go main.go
-COPY pkg/ pkg/
 COPY internal/ internal/
 
 ARG TARGETPLATFORM
@@ -36,7 +35,7 @@ ARG TARGETARCH
 ENV CGO_ENABLED=0
 RUN xx-go build -trimpath -a -o source-controller main.go
 
-FROM alpine:3.21
+FROM alpine:3.23
 
 ARG TARGETPLATFORM
 RUN apk --no-cache add ca-certificates \

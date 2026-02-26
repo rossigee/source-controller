@@ -346,17 +346,17 @@ The `github` provider can be used to authenticate to Git repositories using
 The GitHub App information is specified in `.spec.secretRef` in the format
 specified below:
 
-- Get the App ID from the app settings page at
-  `https://github.com/settings/apps/<app-name>`. 
-- Get the App Installation ID from the app installations page at
-`https://github.com/settings/installations`. Click the installed app, the URL
-will contain the installation ID
-`https://github.com/settings/installations/<installation-id>`. For
-organizations, the first part of the URL may be different, but it follows the
-same pattern.
+- Get the App ID from the app settings page at `https://github.com/settings/apps/<app-name>`.
 - The private key that was generated in the pre-requisites.
 - (Optional) GitHub Enterprise Server users can set the base URL to
   `http(s)://HOSTNAME/api/v3`.
+- (Optional) If GitHub Enterprise Server uses a private CA, include its
+  bundle (root and any intermediates) in `ca.crt`.
+  If the `ca.crt` is specified, then it will be used for TLS verification
+  for all API / Git over `HTTPS` requests to the GitHub Enterprise Server.
+
+**NOTE:** If the secret contains `tls.crt`, `tls.key` then [mutual TLS configuration](#https-mutual-tls-authentication) will be automatically enabled. 
+Omit these keys if the GitHub server does not support mutual TLS.
 
 ```yaml
 apiVersion: v1
@@ -366,13 +366,23 @@ metadata:
 type: Opaque
 stringData:
   githubAppID: "<app-id>"
+  githubAppInstallationOwner: "<github-org-or-user>"
   githubAppInstallationID: "<app-installation-id>"
   githubAppPrivateKey: |
     -----BEGIN RSA PRIVATE KEY-----
     ...
     -----END RSA PRIVATE KEY-----
   githubAppBaseURL: "<github-enterprise-api-url>" #optional, required only for GitHub Enterprise Server users
+  ca.crt: | #optional, for GitHub Enterprise Server users
+    -----BEGIN CERTIFICATE-----
+    ...
+    -----END CERTIFICATE-----
 ```
+
+Exactly one of `githubAppInstallationOwner` or `githubAppInstallationID` must be provided.
+If neither or both are provided, the reconciliation will fail with a misconfiguration error.
+When `githubAppInstallationOwner` is provided, the controller will look for the installation
+ID corresponding to the owner using the GitHub API.
 
 Alternatively, the Flux CLI can be used to automatically create the secret with
 the github app authentication information.
@@ -380,9 +390,27 @@ the github app authentication information.
 ```sh
 flux create secret githubapp ghapp-secret \
     --app-id=1 \
-    --app-installation-id=3 \
-    --app-private-key=~/private-key.pem    
+    --app-installation-owner=my-org \
+    --app-private-key=~/private-key.pem
 ```
+
+### Service Account reference
+
+`.spec.serviceAccountName` is an optional field to specify a Service Account
+in the same namespace as GitRepository with purpose depending on the value of
+the `.spec.provider` field:
+
+- When `.spec.provider` is set to `azure`, the Service Account
+  will be used for Workload Identity authentication. In this case, the controller
+  feature gate `ObjectLevelWorkloadIdentity` must be enabled, otherwise the
+  controller will error out. For Azure DevOps specific setup, see the
+  [Azure DevOps integration guide](https://fluxcd.io/flux/integrations/azure/#for-azure-devops).
+
+**Note:** that for a publicly accessible git repository, you don't need to
+provide a `secretRef` nor `serviceAccountName`.
+
+For a complete guide on how to set up authentication for cloud providers,
+see the integration [docs](/flux/integrations/).
 
 ### Interval
 

@@ -59,6 +59,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	intstorage "github.com/fluxcd/pkg/artifact/digest"
 	"github.com/fluxcd/pkg/gittestserver"
 	"github.com/fluxcd/pkg/runtime/controller"
 	"github.com/fluxcd/pkg/runtime/testenv"
@@ -77,7 +78,7 @@ var (
 	cfg              *rest.Config
 	testEnv          *testenv.Environment
 
-	storage *Storage
+	storage *intstorage.Storage
 
 	examplePublicKey  []byte
 	examplePrivateKey []byte
@@ -477,7 +478,7 @@ func startEnvServer(setupReconcilers func(manager.Manager)) *envtest.Environment
 		panic(err)
 	}
 	defer os.RemoveAll(tmpStoragePath)
-	storage, err = NewStorage(tmpStoragePath, "localhost:5050", time.Minute*1, 2)
+	storage, err = intstorage.New(tmpStoragePath, "localhost:5050", time.Minute*1, 2)
 	if err != nil {
 		panic(err)
 	}

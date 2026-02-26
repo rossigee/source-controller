@@ -77,6 +77,7 @@ const (
 
 // GitRepositorySpec specifies the required configuration to produce an
 // Artifact for a Git repository.
+// +kubebuilder:validation:XValidation:rule="!has(self.serviceAccountName) || (has(self.provider) && self.provider == 'azure')",message="serviceAccountName can only be set when provider is 'azure'"
 type GitRepositorySpec struct {
 	// URL specifies the Git repository URL, it can be an HTTP/S or SSH address.
 	// +kubebuilder:validation:Pattern="^(http|https|ssh)://.*$"
@@ -97,6 +98,11 @@ type GitRepositorySpec struct {
 	// +kubebuilder:validation:Enum=generic;azure;github
 	// +optional
 	Provider string `json:"provider,omitempty"`
+
+	// ServiceAccountName is the name of the Kubernetes ServiceAccount used to
+	// authenticate to the GitRepository. This field is only supported for 'azure' provider.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// Interval at which the GitRepository URL is checked for updates.
 	// This interval is approximate and may be subject to jitter to ensure
@@ -250,12 +256,12 @@ type GitRepositoryStatus struct {
 
 	// Artifact represents the last successful GitRepository reconciliation.
 	// +optional
-	Artifact *Artifact `json:"artifact,omitempty"`
+	Artifact *meta.Artifact `json:"artifact,omitempty"`
 
 	// IncludedArtifacts contains a list of the last successfully included
 	// Artifacts as instructed by GitRepositorySpec.Include.
 	// +optional
-	IncludedArtifacts []*Artifact `json:"includedArtifacts,omitempty"`
+	IncludedArtifacts []*meta.Artifact `json:"includedArtifacts,omitempty"`
 
 	// ObservedIgnore is the observed exclusion patterns used for constructing
 	// the source artifact.
@@ -313,7 +319,7 @@ func (in GitRepository) GetRequeueAfter() time.Duration {
 
 // GetArtifact returns the latest Artifact from the GitRepository if present in
 // the status sub-resource.
-func (in *GitRepository) GetArtifact() *Artifact {
+func (in *GitRepository) GetArtifact() *meta.Artifact {
 	return in.Status.Artifact
 }
 

@@ -199,6 +199,8 @@ The Provider allows for specifying the
 [Amazon AWS Region](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions)
 using the [`.spec.region` field](#region).
 
+For detailed setup instructions, see: https://fluxcd.io/flux/integrations/aws/#for-amazon-simple-storage-service
+
 ##### AWS EC2 example
 
 **Note:** On EKS you have to create an [IAM role](#aws-iam-role-example) for
@@ -271,6 +273,55 @@ type: Opaque
 data:
   accesskey: <BASE64>
   secretkey: <BASE64>
+```
+
+##### AWS Controller-Level Workload Identity example
+
+```yaml
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: Bucket
+metadata:
+  name: aws-controller-level-workload-identity
+  namespace: default
+spec:
+  interval: 5m0s
+  provider: aws
+  bucketName: podinfo
+  endpoint: s3.amazonaws.com
+  region: us-east-1
+  timeout: 30s
+```
+
+##### AWS Object-Level Workload Identity example
+
+**Note:** To use Object-Level Workload Identity (`.spec.serviceAccountName` with 
+cloud providers), the controller feature gate `ObjectLevelWorkloadIdentity` must 
+be enabled.
+
+```yaml
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: Bucket
+metadata:
+  name: aws-object-level-workload-identity
+  namespace: default
+spec:
+  interval: 5m0s
+  provider: aws
+  bucketName: podinfo
+  endpoint: s3.amazonaws.com
+  region: us-east-1
+  serviceAccountName: aws-workload-identity-sa
+  timeout: 30s
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aws-workload-identity-sa
+  namespace: default
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/flux-bucket-role
 ```
 
 #### Azure
@@ -516,83 +567,39 @@ metadata:
 spec:
   interval: 5m0s
   provider: azure
-  bucketName: testsas
-  endpoint: https://testfluxsas.blob.core.windows.net
+  bucketName: testwi
+  endpoint: https://testfluxwi.blob.core.windows.net
 ```
 
-##### Deprecated: Managed Identity with AAD Pod Identity
+##### Azure Object-Level Workload Identity example
 
-If you are using [aad pod identity](https://azure.github.io/aad-pod-identity/docs),
-You need to create an Azure Identity and give it access to Azure Blob Storage.
-
-```sh
-export IDENTITY_NAME="blob-access"
-
-az role assignment create --role "Storage Blob Data Reader"  \
---assignee-object-id "$(az identity show -n $IDENTITY_NAME -o tsv --query principalId  -g $RESOURCE_GROUP)" \
---scope "/subscriptions/<SUBSCRIPTION-ID>/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/<account-name>/blobServices/default/containers/<container-name>"
-
-export IDENTITY_CLIENT_ID="$(az identity show -n ${IDENTITY_NAME} -g ${RESOURCE_GROUP} -otsv --query clientId)"
-export IDENTITY_RESOURCE_ID="$(az identity show -n ${IDENTITY_NAME} -otsv --query id)"
-```
-
-Create an AzureIdentity object that references the identity created above:
+**Note:** To use Object-Level Workload Identity (`.spec.serviceAccountName` with 
+cloud providers), the controller feature gate `ObjectLevelWorkloadIdentity` must 
+be enabled.
 
 ```yaml
 ---
-apiVersion: aadpodidentity.k8s.io/v1
-kind: AzureIdentity
-metadata:
-  name:  # source-controller label will match this name
-  namespace: flux-system
-spec:
-  clientID: <IDENTITY_CLIENT_ID>
-  resourceID: <IDENTITY_RESOURCE_ID>
-  type: 0  # user-managed identity
-```
-
-Create an AzureIdentityBinding object that binds Pods with a specific selector
-with the AzureIdentity created:
-
-```yaml
-apiVersion: "aadpodidentity.k8s.io/v1"
-kind: AzureIdentityBinding
-metadata:
-  name: ${IDENTITY_NAME}-binding
-spec:
-  azureIdentity: ${IDENTITY_NAME}
-  selector: ${IDENTITY_NAME}
-```
-
-Label the source-controller Deployment correctly so that it can match an identity binding:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: kustomize-controller
-  namespace: flux-system
-spec:
-  template:
-    metadata:
-      labels:
-        aadpodidbinding: ${IDENTITY_NAME}  # match the AzureIdentity name
-```
-
-If you have set up aad-pod-identity correctly and labeled the source-controller
-Deployment, then you don't need to reference a Secret.
-
-```yaml
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: Bucket
 metadata:
-  name: azure-bucket
-  namespace: flux-system
+  name: azure-object-level-workload-identity
+  namespace: default
 spec:
   interval: 5m0s
   provider: azure
-  bucketName: testsas
-  endpoint: https://testfluxsas.blob.core.windows.net
+  bucketName: testwi
+  endpoint: https://testfluxwi.blob.core.windows.net
+  serviceAccountName: azure-workload-identity-sa
+  timeout: 30s
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: azure-workload-identity-sa
+  namespace: default
+  annotations:
+    azure.workload.identity/client-id: <AZURE_CLIENT_ID>
+    azure.workload.identity/tenant-id: <AZURE_TENANT_ID>
 ```
 
 ##### Azure Blob SAS Token example
@@ -647,29 +654,16 @@ Refer to the [Azure documentation](https://learn.microsoft.com/en-us/rest/api/st
 
 #### GCP
 
-When a Bucket's `.spec.provider` is set to `gcp`, the source-controller will
-attempt to communicate with the specified [Endpoint](#endpoint) using the
-[Google Client SDK](https://github.com/googleapis/google-api-go-client).
+For detailed setup instructions, see: https://fluxcd.io/flux/integrations/gcp/#for-google-cloud-storage
 
-Without a [Secret reference](#secret-reference), authorization using a
-workload identity is attempted by default. The workload identity is obtained
-using the `GOOGLE_APPLICATION_CREDENTIALS` environment variable, falling back
-to the Google Application Credential file in the config directory.
-When a reference is specified, it expects a Secret with a `.data.serviceaccount`
-value with a GCP service account JSON file.
-
-The Provider allows for specifying the
-[Bucket location](https://cloud.google.com/storage/docs/locations) using the
-[`.spec.region` field](#region).
-
-##### GCP example
+##### GCP Controller-Level Workload Identity example
 
 ```yaml
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: Bucket
 metadata:
-  name: gcp-workload-identity
+  name: gcp-controller-level-workload-identity
   namespace: default
 spec:
   interval: 5m0s
@@ -678,6 +672,37 @@ spec:
   endpoint: storage.googleapis.com
   region: us-east-1
   timeout: 30s
+```
+
+##### GCP Object-Level Workload Identity example
+
+**Note:** To use Object-Level Workload Identity (`.spec.serviceAccountName` with 
+cloud providers), the controller feature gate `ObjectLevelWorkloadIdentity` must 
+be enabled.
+
+```yaml
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: Bucket
+metadata:
+  name: gcp-object-level-workload-identity
+  namespace: default
+spec:
+  interval: 5m0s
+  provider: gcp
+  bucketName: podinfo
+  endpoint: storage.googleapis.com
+  region: us-east-1
+  serviceAccountName: gcp-workload-identity-sa
+  timeout: 30s
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gcp-workload-identity-sa
+  namespace: default
+  annotations:
+    iam.gke.io/gcp-service-account: <identity-name>
 ```
 
 ##### GCP static auth example
@@ -843,19 +868,19 @@ See [Provider](#provider) for more (provider specific) examples.
 
 See [Provider](#provider) for more (provider specific) examples.
 
-### Cert secret reference
+### Mutual TLS Authentication
 
 `.spec.certSecretRef.name` is an optional field to specify a secret containing
-TLS certificate data. The secret can contain the following keys:
+TLS certificate data for mutual TLS authentication.
+
+To authenticate towards a bucket using mutual TLS,
+the referenced Secret's `.data` should contain the following keys:
 
 * `tls.crt` and `tls.key`, to specify the client certificate and private key used
 for TLS client authentication. These must be used in conjunction, i.e.
 specifying one without the other will lead to an error.
 * `ca.crt`, to specify the CA certificate used to verify the server, which is
 required if the server is using a self-signed certificate.
-
-If the server is using a self-signed certificate and has TLS client
-authentication enabled, all three values are required.
 
 The Secret should be of type `Opaque` or `kubernetes.io/tls`. All the files in
 the Secret are expected to be [PEM-encoded][pem-encoding]. Assuming you have
@@ -958,6 +983,29 @@ Secret in the same namespace as the Bucket, containing authentication
 credentials for the object storage. For some `.spec.provider` implementations
 the presence of the field is required, see [Provider](#provider) for more
 details and examples.
+
+### Service Account reference
+
+`.spec.serviceAccountName` is an optional field to specify a Service Account
+in the same namespace as Bucket with purpose depending on the value of
+the `.spec.provider` field:
+
+- When `.spec.provider` is set to `generic`, the controller will fetch the image
+  pull secrets attached to the Service Account and use them for authentication.
+- When `.spec.provider` is set to `aws`, `azure`, or `gcp`, the Service Account
+  will be used for Workload Identity authentication. In this case, the controller
+  feature gate `ObjectLevelWorkloadIdentity` must be enabled, otherwise the
+  controller will error out.
+
+**Note:** that for a publicly accessible object storage, you don't need to
+provide a `secretRef` nor `serviceAccountName`.
+
+**Important:** `.spec.secretRef` and `.spec.serviceAccountName` are mutually
+exclusive and cannot be set at the same time. This constraint is enforced
+at the CRD level.
+
+For a complete guide on how to set up authentication for cloud providers,
+see the integration [docs](/flux/integrations/).
 
 ### Prefix
 

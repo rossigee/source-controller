@@ -229,7 +229,7 @@ type BucketStatus struct {
 
 	// Artifact represents the last successful Bucket reconciliation.
 	// +optional
-	Artifact *apiv1.Artifact `json:"artifact,omitempty"`
+	Artifact *meta.Artifact `json:"artifact,omitempty"`
 
 	// ObservedIgnore is the observed exclusion patterns used for constructing
 	// the source artifact.
@@ -265,18 +265,13 @@ func (in Bucket) GetRequeueAfter() time.Duration {
 }
 
 // GetArtifact returns the latest artifact from the source if present in the status sub-resource.
-func (in *Bucket) GetArtifact() *apiv1.Artifact {
+func (in *Bucket) GetArtifact() *meta.Artifact {
 	return in.Status.Artifact
 }
 
 // +genclient
 // +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// +kubebuilder:deprecatedversion:warning="v1beta2 Bucket is deprecated, upgrade to v1"
-// +kubebuilder:printcolumn:name="Endpoint",type=string,JSONPath=`.spec.endpoint`
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description=""
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description=""
+// +kubebuilder:skipversion
 
 // Bucket is the Schema for the buckets API.
 type Bucket struct {
